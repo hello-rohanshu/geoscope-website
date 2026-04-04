@@ -5,13 +5,6 @@
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -22,5 +15,57 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Font utility classes -----------------------------------------------------------*/
+.font-mea {
+  font-family: var(--font-mea-culpa), cursive;
+}
+
+.font-manrope {
+  font-family: var(--font-manrope), sans-serif;
+}
+
+.font-kanit {
+  font-family: var(--font-kanit), sans-serif;
+}
+
+.font-ibmsans {
+  font-family: var(--font-ibm-sans), sans-serif;
+}
+
+.font-rajdhani {
+  font-family: var(--font-rajdhani), sans-serif;
+}
+
+/* Scrollbar custom design classes  ----------------------------------------------- */
+.scrollbar-custom::-webkit-scrollbar {
+  width: 12px;
+  height: 6px;
+  border-radius: 5 !important;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track {
+  background: rgba(118, 118, 118, 0.1);
+  border-radius: 5 !important;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.6);
+  background-repeat: no-repeat;
+
+
+  border-radius: 5 !important;
+  background-clip: padding-box;
+}
+
+
+/* src/styles/globals.css or a component-specific file */
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}
+
+.scrollbar-hidden {
+  -ms-overflow-style: none; /* IE 10+ */
+  scrollbar-width: none; /* Firefox */
 }

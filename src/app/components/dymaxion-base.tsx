@@ -31,7 +31,7 @@ export default function DymaxionBase() {
       <div className="flex flex-col gap-6 flex-[1] min-w-0 lg:min-w-[280px]">
 
         {/* Overlay Toggles */}
-        <div className="bg-gray-800 rounded-lg border border-gray-600 p-4 space-y-4">
+        <div className="bg-gray-800 rounded-lg border border-gray-600 p-4 space-y-4 flex-1">
 
           <div className="text-gray-300 font-semibold tracking-wide">
             Overlays

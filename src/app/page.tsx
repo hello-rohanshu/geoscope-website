@@ -30,7 +30,7 @@ export default function HomePage() {
     <main className="bg-black relative">
 
       {/* ============ SECTION 1: TITLE SCREEN ============ */}
-      <section className="h-screen flex flex-col items-center justify-center bg-black px-6">
+      <section className="relative h-screen flex flex-col items-center justify-center bg-black px-6">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-light tracking-tight text-white">
             Geoscope
@@ -55,24 +55,21 @@ export default function HomePage() {
       </section>
 
       {/* ============ SECTION 2: STORY OF HUMANITY (TIMELINE) ============ */}
-      <section className="h-screen bg-gradient-to-b from-black via-gray-900 to-gray-950">
+      <section className="bg-gradient-to-b from-black via-gray-900 to-gray-950">
         <TimelineDesign />
       </section>
 
       {/* ============ SECTION 3: DYMAXION MAP ============ */}
-      <section className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black flex items-center">
-        <div className="w-full pt-16 lg:pt-20">
-          <div className="px-6 lg:px-12 pb-8 lg:pb-10">
-            <h2 className="text-3xl lg:text-4xl font-serif text-white mb-2">Dymaxion Map</h2>
-            <p className="text-gray-400 text-sm lg:text-base max-w-lg">
-              A global systems visualization inspired by Buckminster Fuller's projection —
-              revealing planetary patterns without distorting the relationships between lands and peoples.
-            </p>
-          </div>
-          <DymaxionBase />
+      <section className="bg-gradient-to-b from-gray-950 via-gray-900 to-black pt-16 lg:pt-20">
+        <div className="px-6 lg:px-12 pb-8 lg:pb-10">
+          <h2 className="text-3xl lg:text-4xl font-serif text-white mb-2">Dymaxion Map</h2>
+          <p className="text-gray-400 text-sm lg:text-base max-w-lg">
+            A global systems visualization inspired by Buckminster Fuller's projection —
+            revealing planetary patterns without distorting the relationships between lands and peoples.
+          </p>
         </div>
+        <DymaxionBase />
       </section>
-
       {/* ============ FUTURE FEATURES (hidden for V1) ============ */}
       {false && (
         <>

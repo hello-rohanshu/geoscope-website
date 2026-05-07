@@ -6,9 +6,10 @@ import OverlayPopulation from "./dymaxion-overlays/overlay-population";
 
 export default function DymaxionBase() {
   const [showPopulation, setShowPopulation] = useState(true);
+  const [sourceFile, setSourceFile] = useState<string | null>(null);
 
   return (
-    <div className="w-full h-screen bg-black p-12 flex gap-8 bg-gradient-to-b from-gray-950 via-gray-900 to-black">
+    <div className="w-full p-4 sm:p-8 lg:p-12 flex flex-col lg:flex-row gap-6 lg:gap-8">
 
       {/* Left Column: Map + Timeline */}
       <div className="flex flex-col gap-6 flex-[2]">
@@ -16,7 +17,7 @@ export default function DymaxionBase() {
         {/* Map Container */}
         <div className="w-full aspect-[2/1] rounded-2xl shadow-xl overflow-hidden border border-gray-700 bg-gray-900">
           <DymaxionMap>
-            {showPopulation && <OverlayPopulation />}
+            {showPopulation && <OverlayPopulation onSourceFile={setSourceFile} />}
           </DymaxionMap>
         </div>
 
@@ -27,7 +28,7 @@ export default function DymaxionBase() {
       </div>
 
       {/* Right Column: Controls + Cards */}
-      <div className="flex flex-col gap-6 flex-[1] min-w-[280px]">
+      <div className="flex flex-col gap-6 flex-[1] min-w-0 lg:min-w-[280px]">
 
         {/* Overlay Toggles */}
         <div className="bg-gray-800 rounded-lg border border-gray-600 p-4 space-y-4">
@@ -49,16 +50,13 @@ export default function DymaxionBase() {
         </div>
 
         {/* Overlay Cards / Data Views */}
-        <div className="flex-1 bg-gray-800 rounded-lg border border-gray-600 p-4 overflow-y-auto text-gray-300 space-y-4">
+        {/* <div className="flex-1 bg-gray-800 rounded-lg border border-gray-600 p-4 overflow-y-auto text-gray-300 space-y-4">
 
           {showPopulation ? (
             <div className="rounded-lg bg-gray-900 border border-gray-700 p-4">
               <div className="text-sm text-gray-400">Population</div>
-              <div className="text-2xl font-semibold text-red-400">
-                8.1B (dummy)
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Raster-derived global distribution
+              <div className="text-xs text-red-400 font-mono break-all mt-1">
+                {sourceFile ?? "Loading..."}
               </div>
             </div>
           ) : (
@@ -67,7 +65,7 @@ export default function DymaxionBase() {
             </div>
           )}
 
-        </div>
+        </div> */}
       </div>
     </div>
   );

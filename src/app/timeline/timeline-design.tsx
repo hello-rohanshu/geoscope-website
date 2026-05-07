@@ -48,10 +48,10 @@ export default function Timeline() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-gray-950 text-gray-200 flex flex-col">
+    <div className="min-h-screen text-gray-200 flex flex-col">
       {/* --- Timeline Bar --- */}
-      <div className="relative h-[25vh] flex items-center justify-center">
-        <div className="relative w-4/5 h-2 bg-gray-700 rounded-full">
+      <div className="relative h-[15vh] sm:h-[20vh] flex items-center justify-center px-4">
+        <div className="relative w-full max-w-3xl h-2 bg-gray-700 rounded-full">
           <div
             className="absolute h-4 w-4 bg-white rounded-full -top-1 transition-all duration-700"
             style={{
@@ -61,30 +61,56 @@ export default function Timeline() {
         </div>
       </div>
 
+      {/* --- Intro (mobile: top, desktop: hidden because it's in the card area) --- */}
+      <div className="px-6 pb-4 lg:hidden">
+        <h1 className="text-3xl font-serif text-white mb-2">Story of Humanity</h1>
+        <p className="text-gray-400 text-sm leading-relaxed">
+          A journey through time, invention, and the unfolding awareness of our shared 
+          destiny — inspired by Buckminster Fuller's <em>Operating Manual for Spaceship Earth</em>.
+        </p>
+      </div>
+
+      {/* --- Navigation (mobile: top, desktop: right side) --- */}
+      <div className="flex lg:hidden justify-center gap-6 pb-4">
+        <button
+          onClick={handlePrev}
+          className="bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-full shadow-md transition-all"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <button
+          onClick={handleNext}
+          className="bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-full shadow-md transition-all"
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
+
       {/* --- Main Layout --- */}
-      <div className="flex flex-1 px-10 pb-12">
-        {/* Left Column */}
-        <div className="w-1/4 pr-8 flex flex-col justify-center">
+      <div className="flex flex-col lg:flex-row flex-1 px-4 sm:px-10 pb-12 gap-4">
+        {/* Left Column (desktop only) */}
+        <div className="hidden lg:flex lg:w-1/4 lg:pr-8 flex-col justify-center">
           <h1 className="text-4xl font-serif text-white mb-4">Story of Humanity</h1>
           <p className="text-gray-400 leading-relaxed text-sm">
-            This is the story of humanity as told through the visionary lens of Buckminster
-            Fuller, drawn from his <em>Operating Manual for Spaceship Earth</em> — a journey
-            through time, invention, and the unfolding awareness of our shared destiny.
+            A journey through time, invention, and the unfolding awareness of our shared 
+            destiny — inspired by Buckminster Fuller's <em>Operating Manual for Spaceship Earth</em>.
           </p>
         </div>
 
         {/* Middle Column - Card */}
-        <div className="w-3/5 flex flex-col justify-center">
-          <div className="bg-gray-800/60 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-lg p-8 flex flex-col h-[70vh]">
+        <div className="w-full lg:w-3/5 flex flex-col justify-center">
+          <div className="bg-gray-800/60 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-lg p-4 sm:p-8 flex flex-col h-[60vh] sm:h-[70vh]">
             {currentEvent.image && (
               <img
                 src={currentEvent.image}
                 alt={currentEvent.title}
-                className="rounded-xl mb-4 object-cover h-48 w-full"
+                className="rounded-xl mb-4 object-cover h-32 sm:h-48 w-full"
               />
             )}
-            <h2 className="font-serif text-2xl text-white mb-2">{currentEvent.title}</h2>
-            <p className="text-sm text-gray-400 mb-3">
+            <h2 className="font-serif text-xl sm:text-2xl text-white mb-2">
+              {currentEvent.title}
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-400 mb-3">
               {formatDateDisplay(currentEvent)}
               {currentEvent.dateEndValue && ` – ${formatDateDisplay({
                 ...currentEvent,
@@ -101,7 +127,7 @@ export default function Timeline() {
               </>
             )}
 
-            <div className="overflow-y-auto scrollbar-custom flex-1 pr-1">
+            <div className="overflow-y-auto flex-1 pr-1">
               <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line">
                 {currentEvent.story}
               </p>
@@ -109,8 +135,8 @@ export default function Timeline() {
           </div>
         </div>
 
-        {/* Right Column - Navigation */}
-        <div className="w-[10%] pl-6 flex flex-col items-center justify-center space-y-4">
+        {/* Right Column - Navigation (desktop only) */}
+        <div className="hidden lg:flex lg:w-[10%] pl-6 flex-col items-center justify-center space-y-4">
           <button
             onClick={handleNext}
             className="bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-full shadow-md transition-all hover:scale-105"
@@ -123,7 +149,6 @@ export default function Timeline() {
           >
             <ChevronLeft size={20} />
           </button>
-
         </div>
       </div>
     </div>

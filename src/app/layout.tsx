@@ -3,7 +3,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 
 // Font imports
-import { Kanit, Manrope, Mea_Culpa, IBM_Plex_Sans, Rajdhani} from 'next/font/google'
+import { Kanit, Manrope, Mea_Culpa, IBM_Plex_Sans, Rajdhani } from 'next/font/google'
 
 // Font configs
 const kanit = Kanit({
@@ -14,7 +14,7 @@ const kanit = Kanit({
 
 const manrope = Manrope({
   subsets: ['latin'],
-  weight: ['200','300', '400', '500', '600', '700', '800'],
+  weight: ['200', '300', '400', '500', '600', '700', '800'],
   variable: '--font-manrope',
 })
 
@@ -26,7 +26,7 @@ const meaCulpa = Mea_Culpa({
 
 const ibmSans = IBM_Plex_Sans({
   subsets: ['latin'],
-  weight: ['100','200','300', '400', '500', '600', '700'],
+  weight: ['100', '200', '300', '400', '500', '600', '700'],
   variable: '--font-ibm-sans',
 })
 
@@ -43,8 +43,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${kanit.variable} ${manrope.variable} ${meaCulpa.variable} ${ibmSans.variable} ${rajdhani.variable}`}>
-      <body>{children}</body>
+    <html lang="en" className={`bg-black ${kanit.variable} ${manrope.variable} ${meaCulpa.variable} ${ibmSans.variable} ${rajdhani.variable}`}>
+      <body className="bg-black">
+        {children}
+      </body>
     </html>
+
+
   )
 }
+

@@ -7,31 +7,39 @@ import {
   isLoaded,
   getRasterDimensions,
   getValueAtIndex,
-  getLonLatForIndex
+  getLonLatForIndex,
 } from "@/lib/raster-engine";
 import { useMapProjection } from "../dymaxion-map";
 
 const RASTER_URL = "/population_2024_1440x720.tif";
 
 /* ------------------ CONTROLS ------------------ */
-const samplingStep = 1;     // 1 = every raster cell
-const dotRadius = 0.40;      // Presence marker only
+const samplingStep = 1; // 1 = every raster cell
+const dotRadius = 0.4; // Presence marker only
 const opacity = 0.33;
 const color = "#ff0000";
 const maxDots = 35_000_00; // Hard safety valve
 /* ---------------------------------------------- */
 
-export default function OverlayPopulation() {
+export default function OverlayPopulation({
+  onSourceFile,
+}: {
+  onSourceFile?: (filename: string) => void;
+}) {
   const projection = useMapProjection();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (isLoaded()) {
       setReady(true);
+      onSourceFile?.(RASTER_URL.split("/").pop()!);
       return;
     }
-    loadRaster(RASTER_URL).then(ok => {
-      if (ok) setReady(true);
+    loadRaster(RASTER_URL).then((ok) => {
+      if (ok) {
+        setReady(true);
+        onSourceFile?.(RASTER_URL.split("/").pop()!);
+      }
     });
   }, []);
 
@@ -65,8 +73,8 @@ export default function OverlayPopulation() {
       .data(points)
       .enter()
       .append("circle")
-      .attr("cx", d => d.x)
-      .attr("cy", d => d.y)
+      .attr("cx", (d) => d.x)
+      .attr("cy", (d) => d.y)
       .attr("r", dotRadius)
       .attr("fill", color)
       .attr("opacity", opacity)

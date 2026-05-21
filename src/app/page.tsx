@@ -30,28 +30,99 @@ export default function HomePage() {
     <main className="bg-black relative">
 
       {/* ============ SECTION 1: TITLE SCREEN ============ */}
-      <section className="relative h-screen flex flex-col items-center justify-center bg-black px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-light tracking-tight text-white">
+      <section className="relative h-screen flex flex-col items-center justify-center bg-black px-6 overflow-hidden">
+        {/* Subtle atmospheric grain / radial vignette */}
+        <div 
+          className="absolute inset-0 z-0"
+          style={{
+            background: 'radial-gradient(ellipse at center, rgba(20,20,30,0.4) 0%, rgba(0,0,0,0.95) 70%)',
+          }}
+        />
+        
+        {/* Very faint orbital line decoration */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-white/[0.03] z-0" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full border border-white/[0.04] z-0" />
+
+        <div className="relative z-10 max-w-2xl mx-auto text-center">
+          {/* Work in Progress indicator — subtle, above title */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.2, delay: 0.3, ease: "easeOut" }}
+            className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-amber-700/20 bg-amber-900/10 backdrop-blur-sm mb-12"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400/60 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400/80" />
+            </span>
+            <span className="text-[11px] sm:text-xs font-light tracking-[0.15em] uppercase text-amber-200/70">
+              Work in progress
+            </span>
+          </motion.div>
+
+          {/* Main Title */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.4, delay: 0.2, ease: "easeOut" }}
+            className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-normal tracking-[-0.02em] text-white"
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+          >
             Geoscope
-          </h1>
+          </motion.h1>
 
-          <div className="w-12 h-px bg-white/20 mx-auto mt-8 mb-6" />
+          {/* Divider */}
+          <motion.div
+            initial={{ scaleX: 0, opacity: 0 }}
+            animate={{ scaleX: 1, opacity: 1 }}
+            transition={{ duration: 1, delay: 0.8, ease: "easeOut" }}
+            className="w-16 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent mx-auto mt-10 mb-8"
+          />
 
-          <p className="text-sm sm:text-base font-light text-white/40 tracking-wide uppercase">
-            A design science experiment
-          </p>
+          {/* Description */}
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.2, delay: 1, ease: "easeOut" }}
+            className="text-sm sm:text-base font-light text-white/50 tracking-wide leading-relaxed max-w-lg mx-auto"
+            style={{ fontFamily: '"Inter", "Helvetica Neue", system-ui, sans-serif' }}
+          >
+            A design science project, inspired by Buckminster Fuller's Geoscope
+          </motion.p>
 
-          <p className="text-xs sm:text-sm font-light text-white/30 mt-2 max-w-sm mx-auto">
-            Inspired by Buckminster Fuller
-          </p>
+          {/* Secondary detail line */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.6, delay: 1.4 }}
+            className="text-xs font-light text-white/20 mt-6 tracking-[0.1em] uppercase"
+            style={{ fontFamily: '"Inter", "Helvetica Neue", system-ui, sans-serif' }}
+          >
+            Early prototype · evolving continuously
+          </motion.p>
         </div>
 
-        <div className="absolute bottom-8 left-0 right-0 text-center">
-          <p className="text-[11px] sm:text-xs font-light text-white/20 tracking-wider uppercase">
-            Scroll
+        {/* Scroll prompt */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1, delay: 2 }}
+          className="absolute bottom-10 left-0 right-0 text-center z-10"
+        >
+          <p className="text-[10px] sm:text-[11px] font-light text-white/15 tracking-[0.2em] uppercase"
+             style={{ fontFamily: '"Inter", "Helvetica Neue", system-ui, sans-serif' }}>
+            Scroll to explore
           </p>
-        </div>
+          <motion.div
+            animate={{ y: [0, 6, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            className="w-4 h-4 mx-auto mt-2 opacity-20"
+          >
+            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 3v8M4 8l4 4 4-4" stroke="white" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* ============ SECTION 2: STORY OF HUMANITY (TIMELINE) ============ */}
@@ -70,6 +141,7 @@ export default function HomePage() {
         </div>
         <DymaxionBase />
       </section>
+
       {/* ============ FUTURE FEATURES (hidden for V1) ============ */}
       {false && (
         <>

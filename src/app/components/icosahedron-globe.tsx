@@ -1,5 +1,25 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, createContext, useContext } from 'react';
 import * as THREE from 'three';
+
+interface FaceData {
+  vertices: [THREE.Vector3, THREE.Vector3, THREE.Vector3]; // current interpolated positions
+  sphereVertices: [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+  flatVertices: [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+}
+
+interface GlobeContextValue {
+  faces: FaceData[];
+  progress: number; // 0 = sphere, 1 = flat
+  scene: THREE.Scene | null;
+  group: THREE.Group | null;
+}
+
+export const GlobeContext = createContext<GlobeContextValue | null>(null);
+export function useGlobeContext() {
+  const ctx = useContext(GlobeContext);
+  if (!ctx) throw new Error('useGlobeContext must be used inside IcosahedronGlobe');
+  return ctx;
+}
 
 // ──────────────────────────── CONFIGURATION ────────────────────────────
 const MAP_ROTATION_DEG: number = 120;
@@ -11,30 +31,30 @@ const FLARE_AMOUNT: number = 0.7;        // outward bulge
 type Triangle3D = [[number, number, number], [number, number, number], [number, number, number]];
 
 const SPHERE3D: Triangle3D[] = [
-  [[0,0,1],[0.7236068,0.5257311,0.4472136],[0.7236068,-0.5257311,0.4472136]],
-  [[0,0,1],[-0.2763932,0.8506508,0.4472136],[0.7236068,0.5257311,0.4472136]],
-  [[0,0,1],[-0.8944272,0,0.4472136],[-0.2763932,0.8506508,0.4472136]],
-  [[0,0,1],[-0.2763932,-0.8506508,0.4472136],[-0.8944272,0,0.4472136]],
-  [[0,0,1],[0.7236068,-0.5257311,0.4472136],[-0.2763932,-0.8506508,0.4472136]],
-  [[0.8944272,0,-0.4472136],[0.7236068,-0.5257311,0.4472136],[0.7236068,0.5257311,0.4472136]],
-  [[0.7236068,0.5257311,0.4472136],[0.2763932,0.8506508,-0.4472136],[0.8944272,0,-0.4472136]],
-  [[0.2763932,0.8506508,-0.4472136],[0.7236068,0.5257311,0.4472136],[-0.2763932,0.8506508,0.4472136]],
-  [[-0.2763932,0.8506508,0.4472136],[-0.7236068,0.5257311,-0.4472136],[0.2763932,0.8506508,-0.4472136]],
-  [[-0.7236068,0.5257311,-0.4472136],[-0.2763932,0.8506508,0.4472136],[-0.8944272,0,0.4472136]],
-  [[-0.8944272,0,0.4472136],[-0.7236068,-0.5257311,-0.4472136],[-0.7236068,0.5257311,-0.4472136]],
-  [[-0.7236068,-0.5257311,-0.4472136],[-0.8944272,0,0.4472136],[-0.2763932,-0.8506508,0.4472136]],
-  [[-0.2763932,-0.8506508,0.4472136],[0.2763932,-0.8506508,-0.4472136],[-0.7236068,-0.5257311,-0.4472136]],
-  [[0.2763932,-0.8506508,-0.4472136],[-0.2763932,-0.8506508,0.4472136],[0.7236068,-0.5257311,0.4472136]],
-  [[0.7236068,-0.5257311,0.4472136],[0.5854102,-0.4253254,-0.4472136],[0.2763932,-0.8506508,-0.4472136]],
-  [[0.3902735,0.2835503,-0.6314757],[0.8944272,0,-0.4472136],[0.2763932,0.8506508,-0.4472136]],
-  [[0,0,-1],[0.2763932,0.8506508,-0.4472136],[-0.7236068,0.5257311,-0.4472136]],
-  [[0,0,-1],[-0.7236068,0.5257311,-0.4472136],[-0.7236068,-0.5257311,-0.4472136]],
-  [[0,0,-1],[-0.7236068,-0.5257311,-0.4472136],[0.2763932,-0.8506508,-0.4472136]],
-  [[0,0,-1],[0.5854102,-0.4253254,-0.4472136],[0.8944272,0,-0.4472136]],
-  [[0,0,-1],[0.3902735,0.2835503,-0.6314757],[0.2763932,0.8506508,-0.4472136]],
-  [[0,0,-1],[0.8944272,0,-0.4472136],[0.3902735,0.2835503,-0.6314757]],
-  [[0.7236068,-0.5257311,0.4472136],[0.8944272,0,-0.4472136],[0.5854102,-0.4253254,-0.4472136]],
-  [[0.5854102,-0.4253254,-0.4472136],[0,0,-1],[0.2763932,-0.8506508,-0.4472136]],
+  [[0, 0, 1], [0.7236068, 0.5257311, 0.4472136], [0.7236068, -0.5257311, 0.4472136]],
+  [[0, 0, 1], [-0.2763932, 0.8506508, 0.4472136], [0.7236068, 0.5257311, 0.4472136]],
+  [[0, 0, 1], [-0.8944272, 0, 0.4472136], [-0.2763932, 0.8506508, 0.4472136]],
+  [[0, 0, 1], [-0.2763932, -0.8506508, 0.4472136], [-0.8944272, 0, 0.4472136]],
+  [[0, 0, 1], [0.7236068, -0.5257311, 0.4472136], [-0.2763932, -0.8506508, 0.4472136]],
+  [[0.8944272, 0, -0.4472136], [0.7236068, -0.5257311, 0.4472136], [0.7236068, 0.5257311, 0.4472136]],
+  [[0.7236068, 0.5257311, 0.4472136], [0.2763932, 0.8506508, -0.4472136], [0.8944272, 0, -0.4472136]],
+  [[0.2763932, 0.8506508, -0.4472136], [0.7236068, 0.5257311, 0.4472136], [-0.2763932, 0.8506508, 0.4472136]],
+  [[-0.2763932, 0.8506508, 0.4472136], [-0.7236068, 0.5257311, -0.4472136], [0.2763932, 0.8506508, -0.4472136]],
+  [[-0.7236068, 0.5257311, -0.4472136], [-0.2763932, 0.8506508, 0.4472136], [-0.8944272, 0, 0.4472136]],
+  [[-0.8944272, 0, 0.4472136], [-0.7236068, -0.5257311, -0.4472136], [-0.7236068, 0.5257311, -0.4472136]],
+  [[-0.7236068, -0.5257311, -0.4472136], [-0.8944272, 0, 0.4472136], [-0.2763932, -0.8506508, 0.4472136]],
+  [[-0.2763932, -0.8506508, 0.4472136], [0.2763932, -0.8506508, -0.4472136], [-0.7236068, -0.5257311, -0.4472136]],
+  [[0.2763932, -0.8506508, -0.4472136], [-0.2763932, -0.8506508, 0.4472136], [0.7236068, -0.5257311, 0.4472136]],
+  [[0.7236068, -0.5257311, 0.4472136], [0.5854102, -0.4253254, -0.4472136], [0.2763932, -0.8506508, -0.4472136]],
+  [[0.3902735, 0.2835503, -0.6314757], [0.8944272, 0, -0.4472136], [0.2763932, 0.8506508, -0.4472136]],
+  [[0, 0, -1], [0.2763932, 0.8506508, -0.4472136], [-0.7236068, 0.5257311, -0.4472136]],
+  [[0, 0, -1], [-0.7236068, 0.5257311, -0.4472136], [-0.7236068, -0.5257311, -0.4472136]],
+  [[0, 0, -1], [-0.7236068, -0.5257311, -0.4472136], [0.2763932, -0.8506508, -0.4472136]],
+  [[0, 0, -1], [0.5854102, -0.4253254, -0.4472136], [0.8944272, 0, -0.4472136]],
+  [[0, 0, -1], [0.3902735, 0.2835503, -0.6314757], [0.2763932, 0.8506508, -0.4472136]],
+  [[0, 0, -1], [0.8944272, 0, -0.4472136], [0.3902735, 0.2835503, -0.6314757]],
+  [[0.7236068, -0.5257311, 0.4472136], [0.8944272, 0, -0.4472136], [0.5854102, -0.4253254, -0.4472136]],
+  [[0.5854102, -0.4253254, -0.4472136], [0, 0, -1], [0.2763932, -0.8506508, -0.4472136]],
 ];
 
 // ── 2D net (repositioned to share edges correctly) ────────────────────
@@ -47,12 +67,12 @@ const h: number = sqrt3 / 2;
 const f14_A: Point2D = [-1.5, -3.752777];
 const f14_B: Point2D = [-0.5, -3.752777];
 const f14_unsplitApex: Point2D = [-1.0, -3.752777 - h];
-const f14_mid: Point2D = [(f14_unsplitApex[0]+f14_B[0])/2, (f14_unsplitApex[1]+f14_B[1])/2];
+const f14_mid: Point2D = [(f14_unsplitApex[0] + f14_B[0]) / 2, (f14_unsplitApex[1] + f14_B[1]) / 2];
 
 const f15_A: Point2D = [1.5, -0.288675];
 const f15_B: Point2D = [1.0, -1.154701];
 const f15_parentApex: Point2D = [2.0, -1.154701];
-const f15_centroid: Point2D = [(f15_A[0]+f15_B[0]+f15_parentApex[0])/3, (f15_A[1]+f15_B[1]+f15_parentApex[1])/3];
+const f15_centroid: Point2D = [(f15_A[0] + f15_B[0] + f15_parentApex[0]) / 3, (f15_A[1] + f15_B[1] + f15_parentApex[1]) / 3];
 
 const f19_v0: Point2D = [2.0, -1.154701];
 const f19_v2: Point2D = [1.5, -0.288675];
@@ -69,25 +89,25 @@ const f22_free: Point2D = [2.0, 0.57735];
 const f23: Triangle2D = [[2.0, -0.288675], [2.0, -1.154701], [2.5, -0.288675]];
 
 const FLAT2D: Triangle2D[] = [
-  [[-0.500000,-0.288675],[0.500000,-0.288675],[0.000000,0.577350]],
-  [[-0.500000,-0.288675],[0.000000,-1.154701],[0.500000,-0.288675]],
-  [[-0.500000,-0.288675],[-1.000000,-1.154701],[0.000000,-1.154701]],
-  [[-1.500000,-2.020726],[-1.000000,-2.886751],[-0.500000,-2.020726]],
-  [[-2.000000,-2.886751],[-1.500000,-3.752777],[-1.000000,-2.886751]],
-  [[1.500000,-0.288675],[1.000000,0.577350],[0.500000,-0.288675]],
-  [[0.500000,-0.288675],[1.000000,-1.154701],[1.500000,-0.288675]],
-  [[1.000000,-1.154701],[0.500000,-0.288675],[0.000000,-1.154701]],
-  [[0.000000,-1.154701],[0.500000,-2.020726],[1.000000,-1.154701]],
-  [[0.500000,-2.020726],[0.000000,-1.154701],[-0.500000,-2.020726]],
-  [[-0.500000,-2.020726],[0.000000,-2.886751],[0.500000,-2.020726]],
-  [[0.000000,-2.886751],[-0.500000,-2.020726],[-1.000000,-2.886751]],
-  [[-1.000000,-2.886751],[-0.500000,-3.752777],[0.000000,-2.886751]],
-  [[-0.500000,-3.752777],[-1.000000,-2.886751],[-1.500000,-3.752777]],
+  [[-0.500000, -0.288675], [0.500000, -0.288675], [0.000000, 0.577350]],
+  [[-0.500000, -0.288675], [0.000000, -1.154701], [0.500000, -0.288675]],
+  [[-0.500000, -0.288675], [-1.000000, -1.154701], [0.000000, -1.154701]],
+  [[-1.500000, -2.020726], [-1.000000, -2.886751], [-0.500000, -2.020726]],
+  [[-2.000000, -2.886751], [-1.500000, -3.752777], [-1.000000, -2.886751]],
+  [[1.500000, -0.288675], [1.000000, 0.577350], [0.500000, -0.288675]],
+  [[0.500000, -0.288675], [1.000000, -1.154701], [1.500000, -0.288675]],
+  [[1.000000, -1.154701], [0.500000, -0.288675], [0.000000, -1.154701]],
+  [[0.000000, -1.154701], [0.500000, -2.020726], [1.000000, -1.154701]],
+  [[0.500000, -2.020726], [0.000000, -1.154701], [-0.500000, -2.020726]],
+  [[-0.500000, -2.020726], [0.000000, -2.886751], [0.500000, -2.020726]],
+  [[0.000000, -2.886751], [-0.500000, -2.020726], [-1.000000, -2.886751]],
+  [[-1.000000, -2.886751], [-0.500000, -3.752777], [0.000000, -2.886751]],
+  [[-0.500000, -3.752777], [-1.000000, -2.886751], [-1.500000, -3.752777]],
   [f14_A, f14_mid, f14_B],
   [f15_centroid, f15_A, f15_B],
-  [[1.500000,-2.020726],[1.000000,-1.154701],[0.500000,-2.020726]],
-  [[1.000000,-2.886751],[0.500000,-2.020726],[0.000000,-2.886751]],
-  [[1.000000,-2.886751],[0.000000,-2.886751],[0.500000,-3.752777]],
+  [[1.500000, -2.020726], [1.000000, -1.154701], [0.500000, -2.020726]],
+  [[1.000000, -2.886751], [0.500000, -2.020726], [0.000000, -2.886751]],
+  [[1.000000, -2.886751], [0.000000, -2.886751], [0.500000, -3.752777]],
   [f19_v0, f19_mid, f19_v2],
   f20_new,
   f21,
@@ -111,11 +131,11 @@ const bezier3 = (P0: THREE.Vector3, P1: THREE.Vector3, C: THREE.Vector3, t: numb
 };
 
 // ── Vertex key helper ─────────────────────────────────────────────────
-const vertexKey = (v: THREE.Vector3): string => 
+const vertexKey = (v: THREE.Vector3): string =>
   `${Math.round(v.x * 1e5)},${Math.round(v.y * 1e5)},${Math.round(v.z * 1e5)}`;
 
 // ── Build sphere vertex array & control points ────────────────────────
-const SPHERE: THREE.Vector3[][] = SPHERE3D.map((f: Triangle3D) => 
+const SPHERE: THREE.Vector3[][] = SPHERE3D.map((f: Triangle3D) =>
   f.map(([x, y, z]: [number, number, number]) => new THREE.Vector3(x, y, z))
 );
 
@@ -137,14 +157,14 @@ let cx: number = 0, cy: number = 0, n: number = 0;
 FLAT2D.forEach((f: Triangle2D) => f.forEach(([x, y]: Point2D) => { cx += x; cy += y; n++; }));
 cx /= n; cy /= n;
 let mr: number = 0;
-FLAT2D.forEach((f: Triangle2D) => f.forEach(([x, y]: Point2D) => { 
-  mr = Math.max(mr, Math.abs(x - cx), Math.abs(y - cy)); 
+FLAT2D.forEach((f: Triangle2D) => f.forEach(([x, y]: Point2D) => {
+  mr = Math.max(mr, Math.abs(x - cx), Math.abs(y - cy));
 }));
 const SC: number = 1.65 / mr;
 const cosR: number = Math.cos(-MAP_ROTATION_DEG * Math.PI / 180);
 const sinR: number = Math.sin(-MAP_ROTATION_DEG * Math.PI / 180);
 
-const FLAT: THREE.Vector3[][] = FLAT2D.map((f: Triangle2D) => 
+const FLAT: THREE.Vector3[][] = FLAT2D.map((f: Triangle2D) =>
   f.map(([x, y]: Point2D) => {
     const rx: number = (x - cx) * SC;
     const ry: number = (-(y - cy)) * SC;
@@ -152,14 +172,17 @@ const FLAT: THREE.Vector3[][] = FLAT2D.map((f: Triangle2D) =>
   })
 );
 
+export const FLAT_TRANSFORM = { cx, cy, mr, cosR, sinR };
+
 // ── Colour palette ────────────────────────────────────────────────────
 const PAL: string[] = [
-  '#4A90D9','#5BA85A','#3AABBF','#4A90D9','#5BA85A',
-  '#7DC46B','#6CAF8E','#5C8FD9','#8AA0CC','#7DC46B',
-  '#6CAF8E','#5C8FD9','#8AA0CC','#7DC46B',
-  '#E8A838','#E87050','#6CAF8E','#8AA0CC','#5C8FD9',
-  '#E8A838','#E87050','#E87050','#E8A838','#E8A838',
+  '#4A90D9', '#5BA85A', '#3AABBF', '#4A90D9', '#5BA85A',
+  '#7DC46B', '#6CAF8E', '#5C8FD9', '#8AA0CC', '#7DC46B',
+  '#6CAF8E', '#5C8FD9', '#8AA0CC', '#7DC46B',
+  '#E8A838', '#E87050', '#6CAF8E', '#8AA0CC', '#5C8FD9',
+  '#E8A838', '#E87050', '#E87050', '#E8A838', '#E8A838',
 ];
+
 
 // ── Animation state interface ─────────────────────────────────────────
 interface AnimState {
@@ -178,6 +201,7 @@ interface IcosahedronGlobeProps {
   onToggle?: (unfolded: boolean) => void;
   className?: string;
   style?: React.CSSProperties;
+  children?: React.ReactNode;
 }
 
 // ═══════════════ React Component ═══════════════
@@ -188,6 +212,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   onToggle,
   className,
   style,
+  children,
   ...canvasProps
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -205,6 +230,13 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const facesRef = useRef<FaceData[]>([]);
+  const [contextValue, setContextValue] = useState<GlobeContextValue>({
+    faces: [],
+    progress: 0,
+    scene: null,
+    group: null,
+  });
 
   // Toggle folding state
   const toggle = useCallback(() => {
@@ -253,6 +285,31 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       });
       wires[fi].geometry.attributes.position.needsUpdate = true;
     });
+    // Store face data for overlays
+    const numFacesForData: number = SPHERE3D.length;
+    const staggerStepForData: number = STAGGER_RATIO / (numFacesForData - 1);
+    const oneMinusStaggerForData: number = 1 - STAGGER_RATIO;
+
+    facesRef.current = SPHERE3D.map((_: Triangle3D, fi: number) => {
+      const sphereVerts: [THREE.Vector3, THREE.Vector3, THREE.Vector3] = [
+        SPHERE[fi][0].clone(), SPHERE[fi][1].clone(), SPHERE[fi][2].clone()
+      ];
+      const flatVerts: [THREE.Vector3, THREE.Vector3, THREE.Vector3] = [
+        FLAT[fi][0].clone(), FLAT[fi][1].clone(), FLAT[fi][2].clone()
+      ];
+
+      const rawT: number = (globalT - fi * staggerStepForData) / oneMinusStaggerForData;
+      const effT: number = Math.max(0, Math.min(1, rawT));
+      const et: number = ease(effT);
+
+      const currentVerts: [THREE.Vector3, THREE.Vector3, THREE.Vector3] = [
+        bezier3(sphereVerts[0], flatVerts[0], vertexControlMap.get(vertexKey(sphereVerts[0]))!, et),
+        bezier3(sphereVerts[1], flatVerts[1], vertexControlMap.get(vertexKey(sphereVerts[1]))!, et),
+        bezier3(sphereVerts[2], flatVerts[2], vertexControlMap.get(vertexKey(sphereVerts[2]))!, et),
+      ];
+
+      return { vertices: currentVerts, sphereVertices: sphereVerts, flatVertices: flatVerts };
+    });
   }, []);
 
   // Initialise Three.js once
@@ -267,6 +324,8 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
+    // Expose scene on canvas for overlays to find
+    (canvas as any).__threeScene = scene;
     const camera = new THREE.PerspectiveCamera(42, width / height, 0.01, 100);
     camera.position.set(0, 0, 5.6);
     cameraRef.current = camera;
@@ -355,6 +414,13 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
 
       updateGeometry(animRef.current.t);
 
+      setContextValue({
+        faces: [...facesRef.current],
+        progress: animRef.current.t,
+        scene: sceneRef.current,
+        group: groupRef.current,
+      });
+
       if (!drag && groupRef.current) {
         if (animRef.current.t < 0.05) {
           groupRef.current.rotation.y += 0.004;
@@ -378,19 +444,22 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   }, [unfolded]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      className={className}
-      style={{
-        display: 'block',
-        cursor: 'grab',
-        background: '#111',
-        ...style,
-      }}
-      {...canvasProps}
-    />
+    <GlobeContext.Provider value={contextValue}>
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        className={className}
+        style={{
+          display: "block",
+          cursor: "grab",
+          background: "#111",
+          ...style,
+        }}
+        {...canvasProps}
+      />
+      {children}
+    </GlobeContext.Provider>
   );
 };
 

@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
+import WorldGameProgress from './components/world-game-progress';
 import FuelSystemPortal from './areas/earth-systems/portal';
 import LifeSupportPortal from './areas/standard-of-life/portal';
 import CrewHarmonyPortal from './areas/culture/portal';
@@ -135,6 +136,8 @@ export default function HomePage() {
         </motion.div>
       </section>
 
+
+
       {/* ============ SECTION 2: STORY OF HUMANITY (TIMELINE) ============ */}
       <section className="bg-gradient-to-b from-black via-gray-900 to-gray-950">
         <TimelineDesign />
@@ -171,6 +174,11 @@ export default function HomePage() {
             Click to toggle · Drag to rotate
           </p>
         </div>
+      </section>
+
+      {/* ============ SECTION 1: WORLD GAME PROGRESS ============ */}
+      <section className="bg-gradient-to-b from-black via-gray-900 to-black">
+        <WorldGameProgress />
       </section>
 
       {/* ============ FUTURE FEATURES (hidden for V1) ============ */}

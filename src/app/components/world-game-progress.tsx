@@ -75,9 +75,9 @@ export default function WorldGameProgress() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
-            className="self-start sm:self-auto px-3 py-1 text-[10px] uppercase tracking-wider font-medium text-amber-400/80 border border-amber-500/20 bg-amber-500/5 rounded-full backdrop-blur-sm"
+            className="self-start sm:self-auto px-4 py-2 text-sm uppercase tracking-wider font-semibold text-amber-300 border-2 border-amber-500/40 bg-amber-500/10 rounded-full backdrop-blur-sm shadow-lg shadow-amber-500/10"
           >
-            Representative Data Only
+            ⚠ Representative Data Only
           </motion.span>
         </motion.div>
 
@@ -88,7 +88,7 @@ export default function WorldGameProgress() {
               The Critical Path
             </p>
             <span className="text-xl font-light font-mono text-amber-400 tabular-nums">
-              {totalPercent}% <span className="text-zinc-500 text-xs font-sans ml-1">illustrative</span>
+              {totalPercent}% <span className="text-zinc-400 text-sm font-sans ml-2 font-medium">(illustrative)</span>
             </span>
           </div>
           

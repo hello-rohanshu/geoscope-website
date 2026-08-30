@@ -1,18 +1,25 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { feature, merge } from "topojson-client";
 import { geoAirocean } from "d3-geo-polygon";
-import worldData from "@/data/world-110m.json";
-import isoCountries from "@/data/isoCountries";
+import isoCountries from "@/data/isoCountries"; // keep if not in public
 import type { Feature, Geometry } from "geojson";
 
 export default function DymaxionMap() {
   const ref = useRef<SVGSVGElement | null>(null);
+  const [worldData, setWorldData] = useState<any>(null);
 
   useEffect(() => {
-    if (!ref.current) return;
+    fetch('/data/world-110m.json')
+      .then(res => res.json())
+      .then(data => setWorldData(data))
+      .catch(err => console.error('Error loading world data:', err));
+  }, []);
+
+  useEffect(() => {
+    if (!ref.current || !worldData) return;
 
     const svg = d3.select(ref.current);
     svg.selectAll("*").remove();
@@ -24,18 +31,14 @@ export default function DymaxionMap() {
     const world: any = worldData;
     const countries = feature(world, world.objects.countries).features;
 
-    // ---- FIXED: TypeScript requires properties: {} ----
-
-
-const mergedLand: Feature<Geometry> = {
-  type: "Feature",
-  properties: {},
-  geometry: merge(
-    world,
-    world.objects.countries.geometries
-  ) as Geometry,        // <-- explicit cast fixes the error completely
-};
-
+    const mergedLand: Feature<Geometry> = {
+      type: "Feature",
+      properties: {},
+      geometry: merge(
+        world,
+        world.objects.countries.geometries
+      ) as Geometry,
+    };
 
     const projection = geoAirocean()
       .scale(240)
@@ -135,7 +138,7 @@ const mergedLand: Feature<Geometry> = {
         )
         .scale(initialScale)
     );
-  }, []);
+  }, [worldData]); // add worldData as dependency
 
   return (
     <svg

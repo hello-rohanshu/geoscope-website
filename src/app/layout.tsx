@@ -3,37 +3,19 @@ import './globals.css'
 import type { Metadata } from 'next'
 
 // Font imports
-import { Kanit, Manrope, Mea_Culpa, IBM_Plex_Sans, Rajdhani } from 'next/font/google'
+import { Inter, Space_Grotesk } from 'next/font/google'
 
 // Font configs
-const kanit = Kanit({
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800'],
-  variable: '--font-kanit',
-})
-
-const manrope = Manrope({
-  subsets: ['latin'],
-  weight: ['200', '300', '400', '500', '600', '700', '800'],
-  variable: '--font-manrope',
-})
-
-const meaCulpa = Mea_Culpa({
-  subsets: ['latin'],
-  weight: ['400'],
-  variable: '--font-mea-culpa',
-})
-
-const ibmSans = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700'],
-  variable: '--font-ibm-sans',
-})
-
-const rajdhani = Rajdhani({
+const inter = Inter({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-rajdhani',
+  variable: '--font-inter',
+})
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-space-grotesk',
 })
 
 export const metadata: Metadata = {
@@ -43,13 +25,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`bg-black ${kanit.variable} ${manrope.variable} ${meaCulpa.variable} ${ibmSans.variable} ${rajdhani.variable}`}>
+    <html lang="en" className={`bg-black ${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="bg-black">
         {children}
       </body>
     </html>
-
-
   )
 }
-

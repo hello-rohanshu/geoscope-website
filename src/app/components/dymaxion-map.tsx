@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, createContext, useContext } from "react";
 import * as d3 from "d3";
 import { merge } from "topojson-client";
 import { geoAirocean } from "d3-geo-polygon";
-import worldData from "@/data/world-110m.json";
 
 // Context to share projection with overlays
 const MapContext = createContext<d3.GeoProjection | null>(null);
@@ -19,10 +18,18 @@ export default function DymaxionMap({
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [projection, setProjection] = useState<d3.GeoProjection | null>(null);
+  const [worldData, setWorldData] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/data/world-110m.json')
+      .then(res => res.json())
+      .then(data => setWorldData(data))
+      .catch(err => console.error('Error loading world data:', err));
+  }, []);
 
   useEffect(() => {
     const svgEl = svgRef.current;
-    if (!svgEl) return;
+    if (!svgEl || !worldData) return; // wait for data
 
     const parent = svgEl.parentElement;
     if (!parent) return;
@@ -48,8 +55,8 @@ export default function DymaxionMap({
     const mergedLand = {
       type: "Feature",
       geometry: merge(
-        worldData as any,
-        (worldData as any).objects.countries.geometries
+        worldData,
+        worldData.objects.countries.geometries
       ),
     } as GeoJSON.Feature;
 
@@ -66,7 +73,7 @@ export default function DymaxionMap({
     svg.append("g").attr("id", "overlay-layer");
 
     setProjection(() => proj);
-  }, []);
+  }, [worldData]); // depend on worldData
 
   return (
     <svg ref={svgRef} className="w-full h-full block">

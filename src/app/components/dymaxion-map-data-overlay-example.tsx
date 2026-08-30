@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { feature, merge } from "topojson-client";
 import { geoAirocean } from "d3-geo-polygon";
-import worldData from "@/data/world-110m.json";
 import type { Feature, MultiPolygon } from "geojson";
 
 export default function DymaxionMap() {
   const ref = useRef<SVGSVGElement | null>(null);
+  const [worldData, setWorldData] = useState<any>(null);
 
   // simple local population dataset keyed by country numeric ID
   const popData: Record<number, number> = {
@@ -20,7 +20,15 @@ export default function DymaxionMap() {
   };
 
   useEffect(() => {
-    if (!ref.current) return;
+    // Fetch the world data from public directory
+    fetch('/data/world-110m.json')
+      .then(res => res.json())
+      .then(data => setWorldData(data))
+      .catch(err => console.error('Error loading world data:', err));
+  }, []);
+
+  useEffect(() => {
+    if (!ref.current || !worldData) return;
 
     const svg = d3.select(ref.current);
     svg.selectAll("*").remove();
@@ -30,14 +38,12 @@ export default function DymaxionMap() {
 
     const g = svg.append("g");
 
-    const world: any = worldData;
-
-    const countries = feature(world, world.objects.countries).features;
+    const countries = feature(worldData, worldData.objects.countries).features;
 
     // --- MERGED LAND (clean, TS-safe) ---------------------
     const mergedGeom = merge(
-      world,
-      world.objects.countries.geometries
+      worldData,
+      worldData.objects.countries.geometries
     ) as MultiPolygon;
 
     const mergedLand: Feature<MultiPolygon> = {
@@ -142,7 +148,7 @@ export default function DymaxionMap() {
       .on("zoom", (event) => g.attr("transform", event.transform));
     svg.call(zoom);
 
-  }, []);
+  }, [worldData]);
 
   return (
     <svg

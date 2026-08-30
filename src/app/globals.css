@@ -1,66 +1,65 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Design tokens (dark mode default) */
+  --color-bg: #0a0a0a;
+  --color-surface: #262626;
+  --color-accent: #60a5fa;
+  --color-text: #ededed;
+  --color-text-muted: #a3a3a3;
+
+  --font-body: system-ui, -apple-system, sans-serif;
+  --font-display: system-ui, -apple-system, sans-serif;
+
+  --space-unit: 4px;
+  --radius: 8px;
+
+  /* Legacy aliases (can be removed after migration) */
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-bg: #ffffff;
+    --color-surface: #f5f5f5;
+    --color-accent: #3b82f6;
+    --color-text: #171717;
+    --color-text-muted: #737373;
   }
 }
 
+/* Apply fonts globally */
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-inter), sans-serif;
 }
 
-/* Font utility classes -----------------------------------------------------------*/
-.font-mea {
-  font-family: var(--font-mea-culpa), cursive;
-}
-
-.font-manrope {
-  font-family: var(--font-manrope), sans-serif;
-}
-
-.font-kanit {
-  font-family: var(--font-kanit), sans-serif;
-}
-
-.font-ibmsans {
-  font-family: var(--font-ibm-sans), sans-serif;
-}
-
-.font-rajdhani {
-  font-family: var(--font-rajdhani), sans-serif;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-space-grotesk), sans-serif;
 }
 
 /* Scrollbar custom design classes  ----------------------------------------------- */
 .scrollbar-custom::-webkit-scrollbar {
   width: 12px;
   height: 6px;
-  border-radius: 5 !important;
+  border-radius: 5px !important;
 }
 
 .scrollbar-custom::-webkit-scrollbar-track {
   background: rgba(118, 118, 118, 0.1);
-  border-radius: 5 !important;
+  border-radius: 5px !important;
 }
 
 .scrollbar-custom::-webkit-scrollbar-thumb {
   background-color: rgba(75, 85, 99, 0.6);
   background-repeat: no-repeat;
-
-
-  border-radius: 5 !important;
+  border-radius: 5px !important;
   background-clip: padding-box;
 }
 
-
-/* src/styles/globals.css or a component-specific file */
+/* Hide scrollbar */
 .scrollbar-hidden::-webkit-scrollbar {
   display: none; /* Chrome, Safari */
 }

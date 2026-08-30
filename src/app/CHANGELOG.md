@@ -17,5 +17,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **World Game Progress** — dummy progress bar between today and utopia
 - **Portal system** — 4 cards showing humanity's current situation at a glance, not yet on page
 
-### Known Issues
-- Everything lags, is unpolished
+### Problems
+- Everything lags, is unpolished and may also crash older devices

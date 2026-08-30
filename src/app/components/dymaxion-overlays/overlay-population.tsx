@@ -8,7 +8,7 @@ import {
   getRasterDimensions,
   getValueAtIndex,
   getLonLatForIndex,
-} from "@/lib/raster-engine";
+} from "@/utils/raster-engine"
 import { useMapProjection } from "../dymaxion-map";
 
 const RASTER_URL = "/population_2024_1440x720.tif";

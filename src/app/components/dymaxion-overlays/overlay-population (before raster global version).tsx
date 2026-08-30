@@ -4,7 +4,7 @@
 import { useEffect } from "react";
 import * as d3 from "d3";
 
-import isoCountries from "@/data/isoCountries.json";
+import isoCountries from "@/data/isoCountries";
 
 type ISOEntry = {
     iso3: string;

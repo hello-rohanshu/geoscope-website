@@ -13,7 +13,7 @@ import NavigationPortal from './areas/science/portal';
 import PopulationPortal from './areas/population/population-portal';
 import PortalCard from './components/portal-design';
 import EarthSim from './components/earth-sim';
-import IcosahedronGlobe from './components/icosahedron-globe'; // ← added
+import IcosahedronGlobe from './components/icosahedron-globe';
 import TimelineDesign from './timeline/timeline-design';
 import DesignScienceProgress from './components/design-science-progress';
 import DymaxionBase from './components/dymaxion-base';
@@ -69,7 +69,6 @@ export default function HomePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.4, delay: 0.2, ease: 'easeOut' }}
             className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-normal tracking-[-0.02em] text-white"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
           >
             Geoscope
           </motion.h1>
@@ -88,7 +87,6 @@ export default function HomePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1.2, delay: 1, ease: 'easeOut' }}
             className="text-sm sm:text-base font-light text-white/50 tracking-wide leading-relaxed max-w-lg mx-auto"
-            style={{ fontFamily: '"Inter", "Helvetica Neue", system-ui, sans-serif' }}
           >
             A design science project, inspired by Buckminster Fuller's Geoscope
           </motion.p>
@@ -99,7 +97,6 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 1.6, delay: 1.4 }}
             className="text-xs font-light text-white/20 mt-6 tracking-[0.1em] uppercase"
-            style={{ fontFamily: '"Inter", "Helvetica Neue", system-ui, sans-serif' }}
           >
             Early prototype · evolving continuously
           </motion.p>
@@ -112,10 +109,7 @@ export default function HomePage() {
           transition={{ duration: 1, delay: 2 }}
           className="absolute bottom-10 left-0 right-0 text-center z-10"
         >
-          <p
-            className="text-[10px] sm:text-[11px] font-light text-white/15 tracking-[0.2em] uppercase"
-            style={{ fontFamily: '"Inter", "Helvetica Neue", system-ui, sans-serif' }}
-          >
+          <p className="text-[10px] sm:text-[11px] font-light text-white/15 tracking-[0.2em] uppercase">
             Scroll to explore
           </p>
           <motion.div
@@ -136,8 +130,6 @@ export default function HomePage() {
         </motion.div>
       </section>
 
-
-
       {/* ============ SECTION 2: STORY OF HUMANITY (TIMELINE) ============ */}
       <section className="bg-gradient-to-b from-black via-gray-900 to-gray-950">
         <TimelineDesign />
@@ -146,7 +138,7 @@ export default function HomePage() {
       {/* ============ SECTION 3: DYMAXION MAP ============ */}
       <section className="bg-gradient-to-b from-gray-950 via-gray-900 to-black pt-16 lg:pt-20">
         <div className="px-6 lg:px-12 pb-8 lg:pb-10">
-          <h2 className="text-3xl lg:text-4xl font-serif text-white mb-2">Dymaxion Map</h2>
+          <h2 className="text-3xl lg:text-4xl text-white mb-2">Dymaxion Map</h2>
           <p className="text-gray-400 text-sm lg:text-base max-w-lg">
             A global systems visualization inspired by Buckminster Fuller's projection —
             revealing planetary patterns without distorting the relationships between lands and peoples.
@@ -158,7 +150,7 @@ export default function HomePage() {
       {/* ============ SECTION 4: ICOSAHEDRON GLOBE (NEW) ============ */}
       <section className="bg-gradient-to-b from-black via-gray-950 to-black py-24 lg:py-32">
         <div className="px-6 lg:px-12 text-center">
-          <h2 className="text-3xl lg:text-4xl font-serif text-white mb-2">Icosahedron Globe</h2>
+          <h2 className="text-3xl lg:text-4xl text-white mb-2">Icosahedron Globe</h2>
           <p className="text-gray-400 text-sm lg:text-base max-w-lg mx-auto mb-12">
             An interactive geodesic projection — click to toggle display mode, drag to rotate.
           </p>
@@ -167,10 +159,7 @@ export default function HomePage() {
             <IcosahedronGlobe width={680} height={500} />
           </div>
 
-          <p
-            className="text-[11px] sm:text-xs font-light text-white/20 tracking-[0.1em] uppercase mt-6"
-            style={{ fontFamily: '"Inter", "Helvetica Neue", system-ui, sans-serif' }}
-          >
+          <p className="text-[11px] sm:text-xs font-light text-white/20 tracking-[0.1em] uppercase mt-6">
             Click to toggle · Drag to rotate
           </p>
         </div>
@@ -207,7 +196,7 @@ export default function HomePage() {
             return (
               <motion.div
                 key={portal.title}
-                className={`portal-card-wrapper flex ${alignmentClasses} pointer-events-auto will-change-transfrom`}
+                className={`portal-card-wrapper flex ${alignmentClasses} pointer-events-auto will-change-transform`}
                 animate={{ x: showHUD ? 0 : offscreenX }}
                 transition={{ duration: 0.5, ease: 'easeInOut' }}
               >

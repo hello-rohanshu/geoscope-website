@@ -11,7 +11,7 @@ import {
 } from "@/utils/raster-engine"
 import { useMapProjection } from "../dymaxion-map";
 
-const RASTER_URL = "/population_2024_1440x720.tif";
+const RASTER_URL = "/population_2024_1440x720_cog.tif";
 
 /* ------------------ CONTROLS ------------------ */
 const samplingStep = 1; // 1 = every raster cell

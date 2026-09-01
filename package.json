@@ -3,16 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-  "dev": "next dev --webpack",
-  "build": "next build",
-  "start": "next start",
-  "lint": "next lint",
-  "cesium-assets": "cp -r node_modules/cesium/Build/Cesium/Workers public/cesium/Workers && cp -r node_modules/cesium/Build/Cesium/Assets public/cesium/Assets && cp -r node_modules/cesium/Build/Cesium/Widgets public/cesium/Widgets && cp -r node_modules/cesium/Build/Cesium/ThirdParty public/cesium/ThirdParty"
+    "dev": "next dev --webpack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
-    "cesium": "^1.144.0",
     "d3": "^7.9.0",
     "d3-geo": "^3.1.1",
     "d3-geo-polygon": "^2.0.1",

@@ -13,6 +13,7 @@ import NavigationPortal from './areas/science/portal';
 import PopulationPortal from './areas/population/population-portal';
 import PortalCard from './components/portal-design';
 import EarthSim from './components/earth-sim';
+// import { EarthSim } from './components/earth-sim-cesium';
 import IcosahedronGlobe from './components/icosahedron-globe';
 import TimelineDesign from './components/timeline/timeline-design';
 import DesignScienceProgress from './components/design-science-progress';

@@ -10,6 +10,7 @@ export const EarthSim = () => {
 
   useEffect(() => {
     if (!containerRef.current) return;
+    (window as any).CESIUM_BASE_URL = '/cesium';
 
     // Create the Cesium Viewer
     viewerRef.current = new Cesium.Viewer(containerRef.current, {
@@ -58,7 +59,7 @@ export const EarthSim = () => {
         left: 0,
         width: '100%',
         height: '100%',
-        zIndex: -1, // So it can be used as background
+        zIndex: 0, // Changed from -1 to 0
       }}
     />
   );

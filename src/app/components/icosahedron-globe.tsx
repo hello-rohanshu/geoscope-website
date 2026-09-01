@@ -8,6 +8,7 @@ import {
   PopulationBuffers, PopulationSample, buildPopulationBuffers, updatePopulationPositions, createPopulationPoints,
 } from '@/utils/population-layer';
 
+
 // ──────────────────────────── CONFIGURATION ────────────────────────────
 const ANIMATION_SPEED: number = 0.05;
 const STAGGER_RATIO: number = 0.0;       // 0 = fully synchronised
@@ -35,8 +36,8 @@ interface IcosahedronGlobeProps {
 }
 
 const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
-  width = 680,
-  height = 500,
+  width,
+  height,
   unfolded = false,
   onToggle,
   className,
@@ -49,6 +50,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   ...canvasProps
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<THREE.Group | null>(null);
   const meshesRef = useRef<THREE.Mesh[]>([]);
   const wiresRef = useRef<THREE.LineSegments[]>([]);
@@ -113,19 +115,54 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     }
   }, []);
 
+  // Handle responsive sizing
+  useEffect(() => {
+    const container = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return;
+
+    const resizeCanvas = () => {
+      const rect = container.getBoundingClientRect();
+      const w = width || rect.width;
+      const h = height || rect.height;
+      
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      
+      if (rendererRef.current) {
+        rendererRef.current.setSize(w, h, false);
+      }
+      
+      if (cameraRef.current) {
+        cameraRef.current.aspect = w / h;
+        cameraRef.current.updateProjectionMatrix();
+      }
+    };
+
+    resizeCanvas();
+    
+    const resizeObserver = new ResizeObserver(resizeCanvas);
+    resizeObserver.observe(container);
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [width, height]);
+
   // Initialise Three.js once
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.01, 100);
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100);
     camera.position.set(0, 0, 5.6);
     cameraRef.current = camera;
 
@@ -272,20 +309,22 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   }, [unfolded]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      className={className}
-      style={{
-        display: 'block',
-        cursor: 'grab',
-        background: 'transparent',
-        border: '1px solid white',
-        ...style,
-      }}
-      {...canvasProps}
-    />
+    <div ref={containerRef} className="w-full h-full">
+      <canvas
+        ref={canvasRef}
+        className={className}
+        style={{
+          display: 'block',
+          cursor: 'grab',
+          background: 'transparent',
+          border: '1px solid white',
+          width: '100%',
+          height: '100%',
+          ...style,
+        }}
+        {...canvasProps}
+      />
+    </div>
   );
 };
 

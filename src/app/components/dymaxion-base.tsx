@@ -17,18 +17,37 @@ export default function DymaxionBase() {
   }, []);
 
   return (
-    <div className="w-full p-4 sm:p-8 lg:p-12 flex flex-col lg:flex-row gap-6 lg:gap-8">
-      <div className="flex flex-col gap-6 flex-[2]">
-        <div className="w-full aspect-[2/1] rounded-2xl shadow-xl overflow-hidden border border-gray-700 bg-gray-900">
+    <div className="w-full min-h-screen p-4 sm:p-6 lg:p-8 flex flex-col xl:flex-row gap-6 lg:gap-8">
+      <div className="flex flex-col gap-6 flex-[3] min-w-0">
+        <div className="w-full flex-1 min-h-[500px] lg:min-h-[600px] rounded-2xl shadow-xl overflow-hidden border border-gray-700 bg-gray-900">
           <IcosahedronGlobe populationSamples={samples} showPopulation={showPopulation} />
         </div>
+        <div className="w-full h-24 bg-gray-800 rounded-lg border border-gray-600 p-4 flex items-center">
+          <div className="w-full">
+            <div className="flex justify-between text-xs text-gray-400 mb-2">
+              <span>1950</span>
+              <span>1975</span>
+              <span>2000</span>
+              <span>2024</span>
+            </div>
+            <div className="relative h-2 bg-gray-700 rounded-full">
+              <div className="absolute left-0 top-0 h-full w-1/3 bg-red-500 rounded-full"></div>
+              <div className="absolute left-1/3 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-md"></div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="flex flex-col gap-6 flex-[1] min-w-0 lg:min-w-[280px]">
-        <div className="bg-gray-800 rounded-lg border border-gray-600 p-4 space-y-4 flex-1">
-          <div className="text-gray-300 font-semibold tracking-wide">Overlays</div>
-          <label className="flex items-center gap-3 text-gray-300 cursor-pointer select-none">
-            <input type="checkbox" checked={showPopulation} onChange={() => setShowPopulation(v => !v)} className="accent-red-500" />
-            <span>Population</span>
+      <div className="flex flex-col gap-6 flex-[1] min-w-0 xl:min-w-[300px] xl:max-w-[400px]">
+        <div className="bg-gray-800 rounded-lg border border-gray-600 p-6 space-y-6 flex-1">
+          <div className="text-gray-300 font-semibold tracking-wide text-lg">Overlays</div>
+          <label className="flex items-center gap-3 text-gray-300 cursor-pointer select-none group">
+            <input 
+              type="checkbox" 
+              checked={showPopulation} 
+              onChange={() => setShowPopulation(v => !v)} 
+              className="accent-red-500 w-4 h-4 cursor-pointer" 
+            />
+            <span className="group-hover:text-white transition-colors">Population</span>
           </label>
         </div>
       </div>

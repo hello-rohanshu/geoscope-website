@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  /* Map design tokens to Next.js font variables */
+  --font-body: var(--font-body-next);
+  --font-display: var(--font-display-next);
+
   /* Design tokens (dark mode default) */
   --color-bg: #0a0a0a;
   --color-surface: #262626;
@@ -8,13 +12,10 @@
   --color-text: #ededed;
   --color-text-muted: #a3a3a3;
 
-  --font-body: system-ui, -apple-system, sans-serif;
-  --font-display: system-ui, -apple-system, sans-serif;
-
   --space-unit: 4px;
   --radius: 8px;
 
-  /* Legacy aliases (can be removed after migration) */
+  /* Legacy aliases */
   --background: var(--color-bg);
   --foreground: var(--color-text);
 }
@@ -33,14 +34,14 @@
 body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-inter), sans-serif;
+  font-family: var(--font-body), sans-serif;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-space-grotesk), sans-serif;
+  font-family: var(--font-display), sans-serif;
 }
 
-/* Scrollbar custom design classes  ----------------------------------------------- */
+/* Scrollbar custom design classes */
 .scrollbar-custom::-webkit-scrollbar {
   width: 12px;
   height: 6px;
@@ -61,10 +62,10 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Hide scrollbar */
 .scrollbar-hidden::-webkit-scrollbar {
-  display: none; /* Chrome, Safari */
+  display: none;
 }
 
 .scrollbar-hidden {
-  -ms-overflow-style: none; /* IE 10+ */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

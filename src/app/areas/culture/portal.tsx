@@ -1,8 +1,8 @@
 // app/areas/culture/portal.tsx
 import React from "react";
 import { Users } from "lucide-react";
-import { PortalConfig } from "../../components/portal-config";
-import {CulturePortal} from "../../components/crew-harmony-portal";
+import { PortalConfig } from "../../components/portal-design/portal-config";
+import {CulturePortal} from "../../components/portal-crew-harmony/crew-harmony-portal";
 
 const CrewMetricCard: React.FC = () => {
   return <div className="h-full w-full">

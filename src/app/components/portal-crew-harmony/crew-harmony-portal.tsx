@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { harmonyMetrics } from "../components/crew-harmony-data";
-import { CrewHarmonyGraph } from "../components/crew-harmony-graph";
-import { DropAnimation } from "../components/drop-animation";
+import { harmonyMetrics } from "./crew-harmony-data";
+import { CrewHarmonyGraph } from "./crew-harmony-graph";
+import { DropAnimation } from "../ui/drop-animation";
 
 export const CulturePortal: React.FC = () => {
   return (

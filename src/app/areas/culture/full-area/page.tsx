@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { motion } from "framer-motion"
-import DymaxionMap from "../../../components/dymaxion-map"  // ← replaced component
+import DymaxionMap from "../../../components/dymaxion-group/[reference]-dymaxion-map-basic"  // ← replaced component
 
 export default function CultureFullAreaPage() {
   const [time, setTime] = useState(2025)

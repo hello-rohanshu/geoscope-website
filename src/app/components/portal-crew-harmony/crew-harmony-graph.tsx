@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import { harmonyData, harmonyMetrics } from "../components/crew-harmony-data";
+import { harmonyData, harmonyMetrics } from "./crew-harmony-data";
 
 type CrewHarmonyGraphProps = {
   metric: keyof typeof harmonyMetrics;

@@ -1,5 +1,5 @@
 // src/data/metadata-index.ts
-import { fuelMetadata } from "./fuel-data";
+import { fuelMetadata } from "../portal-fuel/fuel-data";
 
 export const metadataIndex = {
   ...fuelMetadata,

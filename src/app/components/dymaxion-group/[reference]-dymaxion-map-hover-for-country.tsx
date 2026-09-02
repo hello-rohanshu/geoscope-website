@@ -4,14 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { feature, merge } from "topojson-client";
 import { geoAirocean } from "d3-geo-polygon";
-import isoCountries from "@/data/isoCountries"; // keep if not in public
-import type { Feature, Geometry } from "geojson";
+import isoCountries from "@/data/isoCountries"; // Add this import
+import type { Feature, MultiPolygon } from "geojson";
 
-export default function DymaxionMap() {
+export default function DymaxionMapDataOverlayExample() {
   const ref = useRef<SVGSVGElement | null>(null);
   const [worldData, setWorldData] = useState<any>(null);
 
+  // simple local population dataset keyed by country numeric ID
+  const popData: Record<number, number> = {
+    356: 1400000000, // India
+    840: 330000000,  // USA
+    156: 1410000000, // China
+    250: 67000000,   // France
+    76: 210000000,   // Brazil
+  };
+
   useEffect(() => {
+    // Fetch the world data from public directory
     fetch('/data/world-110m.json')
       .then(res => res.json())
       .then(data => setWorldData(data))
@@ -26,57 +36,73 @@ export default function DymaxionMap() {
 
     const width = 960;
     const height = 480;
+
     const g = svg.append("g");
 
-    const world: any = worldData;
-    const countries = feature(world, world.objects.countries).features;
+    const countries = feature(worldData, worldData.objects.countries).features;
 
-    const mergedLand: Feature<Geometry> = {
+    // --- MERGED LAND (clean, TS-safe) ---------------------
+    const mergedGeom = merge(
+      worldData,
+      worldData.objects.countries.geometries
+    ) as MultiPolygon;
+
+    const mergedLand: Feature<MultiPolygon> = {
       type: "Feature",
       properties: {},
-      geometry: merge(
-        world,
-        world.objects.countries.geometries
-      ) as Geometry,
+      geometry: mergedGeom
     };
+    // --------------------------------------------------------
 
-    const projection = geoAirocean()
-      .scale(240)
-      .translate([width / 2 - 100, height / 2]);
-
+    const projection = geoAirocean().scale(240).translate([width / 2, height / 2]);
     const path = d3.geoPath(projection as any);
 
-    // Draw the seamless landmass (no borders, no seams)
+    // base landmass
     g.append("path")
-      .attr("class", "landmass")
       .attr("d", path(mergedLand)!)
       .attr("fill", "#dcdcdc")
       .attr("stroke", "none");
 
-    // Single-path hover highlight
+    // population circles
+    countries.forEach((d: any) => {
+      const id = d.id;
+      const pop = popData[id];
+      if (!pop) return;
+
+      const centroid = path.centroid(d);
+      if (isNaN(centroid[0]) || isNaN(centroid[1])) return;
+
+      g.append("circle")
+        .attr("cx", centroid[0])
+        .attr("cy", centroid[1])
+        .attr("r", Math.sqrt(pop) / 5000)
+        .attr("fill", "rgba(255,0,0,0.5)")
+        .attr("stroke", "#800")
+        .attr("stroke-width", 0.4);
+    });
+
+    // hover highlight
     const highlight = g.append("path")
       .attr("fill", "rgba(120,180,255,0.4)")
       .attr("stroke", "none")
       .style("pointer-events", "none")
       .style("opacity", 0);
 
-    // Hover label
+    // label
     const labelGroup = svg.append("g").style("pointer-events", "none");
-
     const labelBg = labelGroup.append("rect")
       .attr("fill", "white")
       .attr("rx", 4)
       .attr("ry", 4)
       .style("opacity", 0);
-
     const labelText = labelGroup.append("text")
-      .attr("fill", "#000")
+      .attr("fill", "black")
       .attr("font-size", 14)
       .attr("font-weight", "500")
       .style("opacity", 0)
       .style("font-family", "sans-serif");
 
-    // Invisible hit-layer for hover detection
+    // hit layer
     g.selectAll("path.hit-country")
       .data(countries)
       .join("path")
@@ -85,13 +111,14 @@ export default function DymaxionMap() {
       .attr("fill", "transparent")
       .attr("stroke", "none")
       .on("mouseover", function (event, d: any) {
-        highlight
-          .attr("d", path(d)!)
-          .style("opacity", 1);
+        highlight.attr("d", path(d)!).style("opacity", 1);
 
-        const name = isoCountries[d.id as keyof typeof isoCountries] || `ID ${d.id}`;
+        const entry = isoCountries[d.id as keyof typeof isoCountries];
+        const countryName = entry?.name || `ID ${d.id}`;
+        const pop = popData[d.id] ? ` (Pop: ${popData[d.id].toLocaleString()})` : "";
 
-        labelText.text(name)
+        labelText
+          .text(`${countryName}${pop}`)
           .attr("x", event.offsetX + 8)
           .attr("y", event.offsetY - 8)
           .style("opacity", 1);
@@ -110,9 +137,7 @@ export default function DymaxionMap() {
           .attr("y", event.offsetY - 8);
 
         const bbox = labelText.node()!.getBBox();
-        labelBg
-          .attr("x", bbox.x - 4)
-          .attr("y", bbox.y - 2);
+        labelBg.attr("x", bbox.x - 4).attr("y", bbox.y - 2);
       })
       .on("mouseout", function () {
         highlight.style("opacity", 0);
@@ -120,32 +145,20 @@ export default function DymaxionMap() {
         labelBg.style("opacity", 0);
       });
 
-    // Zoom & pan
+    // zoom
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.2, 10])
+      .scaleExtent([0.150, 10])
       .on("zoom", (event) => g.attr("transform", event.transform));
-
     svg.call(zoom);
 
-    // Initial zoom-out
-    const initialScale = 0.2;
-    svg.call(
-      zoom.transform,
-      d3.zoomIdentity
-        .translate(
-          (width / 2) * (1 - initialScale),
-          (height / 2) * (1 - initialScale)
-        )
-        .scale(initialScale)
-    );
-  }, [worldData]); // add worldData as dependency
+  }, [worldData]);
 
   return (
     <svg
       ref={ref}
       viewBox="0 0 960 480"
       className="w-full h-full"
-      style={{ background: "#1a1a1a", cursor: "grab" }}
+      style={{ background: "#1a1a1a" }}
     />
   );
 }

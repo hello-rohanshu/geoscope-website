@@ -1,10 +1,10 @@
 // app/areas/science/portal.tsx
 import React from "react";
 import { Compass } from "lucide-react";
-import { PortalConfig } from "../../components/portal-config";
-import NavigationRadarChart from "../../components/navigation-graph-vertical";
-import NavReadinessCol from "../../components/navigation-readiness-column";
-import NavigationTimeGraph from "../../components/navigation-time-graph";
+import { PortalConfig } from "../../components/portal-design/portal-config";
+import NavigationRadarChart from "../../components/portal-navigation/navigation-graph-vertical";
+import NavReadinessCol from "../../components/portal-navigation/navigation-readiness-column";
+import NavigationTimeGraph from "../../components/portal-navigation/navigation-time-graph";
 
 const NavigationMetricCard: React.FC = () => {
   return (

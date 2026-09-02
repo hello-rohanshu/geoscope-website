@@ -5,18 +5,18 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
-import WorldGameProgress from './components/world-game-progress';
+import WorldGameProgress from './components/design-science-progress';
 import FuelSystemPortal from './areas/earth-systems/portal';
 import LifeSupportPortal from './areas/standard-of-life/portal';
 import CrewHarmonyPortal from './areas/culture/portal';
 import NavigationPortal from './areas/science/portal';
 import PopulationPortal from './areas/population/population-portal';
-import PortalCard from './components/portal-design';
+import PortalCard from './components/portal-design/portal-design';
 import EarthSim from './components/earth-sim';
-import IcosahedronGlobe from './components/icosahedron-globe';
+import IcosahedronGlobe from './components/dymaxion-group/icosahedron-globe';
 import TimelineDesign from './components/timeline/timeline-design';
 import DesignScienceProgress from './components/design-science-progress';
-import DymaxionBase from './components/dymaxion-base';
+import DymaxionBase from './components/dymaxion-group/dymaxion-base';
 
 export default function HomePage() {
   const router = useRouter();

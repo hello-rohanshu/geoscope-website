@@ -2,7 +2,7 @@
 
 import React from "react";
 import CrewHarmonyPortal from "./portal";
-import PortalCard from "../../components/portal-design";
+import PortalCard from "../../components/portal-design/portal-design";
 
 export default function CulturePage() {
   return (

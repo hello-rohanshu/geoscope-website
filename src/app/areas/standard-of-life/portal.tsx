@@ -1,9 +1,9 @@
 // app/areas/standard-of-life/portal.tsx
 import React from "react";
 import { Heart } from "lucide-react";
-import { PortalConfig } from "../../components/portal-config";
-import { LifeSupportPies } from "../../components/life-support-pies";
-import { LifeSupportGraph } from "../../components/life-support-graph";
+import { PortalConfig } from "../../components/portal-design/portal-config";
+import { LifeSupportPies } from "../../components/portal-life-support/life-support-pies";
+import { LifeSupportGraph } from "../../components/portal-life-support/life-support-graph";
 
 const LifeSupportMetricCard: React.FC = () => {
   return (

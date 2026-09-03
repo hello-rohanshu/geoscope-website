@@ -9,7 +9,7 @@ import {
 } from '@/utils/population-layer';
 
 import {
-  createFaceMaterials, applyFaceUVs,
+  createFaceMaterials, applyFaceSphereAttribute,
   type BaseLayerMode, type FaceMaterialsOptions,
 } from '@/utils/face-materials';
 
@@ -212,10 +212,10 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     SPHERE3D.forEach((_, fi: number) => {
       // ── Mesh geometry: 12 sub-vertices = 4 sub-triangles, non-indexed ──
       // Float32Array(36): 12 vertices × 3 floats each.
-      // UVs are Float32Array(24): 12 vertices × 2 floats, set by applyFaceUVs.
+      // aSpherePos is Float32Array(36): 12 vertices × 3 floats, set by applyFaceSphereAttribute.
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(36), 3));
-      applyFaceUVs(geo, fi);
+      applyFaceSphereAttribute(geo, fi);
       const mesh = new THREE.Mesh(geo, faceMaterials[fi]);
       mesh.renderOrder = 0;
       grp.add(mesh);

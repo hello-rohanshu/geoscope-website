@@ -207,3 +207,17 @@ export const SUB_BARY: [number, number, number][] = [
   [0,   0.5, 0.5],
   [0.5, 0,   0.5],
 ];
+
+// ── Per-face sub-vertex positions on the UNIT SPHERE (static) ─────────
+// Doesn't change with fold animation. Used as a custom vertex attribute so
+// the polar-safe texture shader can compute exact lon/lat per pixel instead
+// of interpolating baked-per-vertex UVs (see face-materials.ts).
+export const FACE_SPHERE_POSITIONS: Float32Array[] = SPHERE3D.map((face) => {
+  const arr = new Float32Array(36);
+  SUB_BARY.forEach(([w0, w1, w2], i) => {
+    arr[i * 3]     = w0 * face[0][0] + w1 * face[1][0] + w2 * face[2][0];
+    arr[i * 3 + 1] = w0 * face[0][1] + w1 * face[1][1] + w2 * face[2][1];
+    arr[i * 3 + 2] = w0 * face[0][2] + w1 * face[1][2] + w2 * face[2][2];
+  });
+  return arr;
+});

@@ -9,6 +9,11 @@
 // linearly interpolated can represent that, no matter how it's unwrapped.
 // Per-fragment computation has no such limit — every pixel is independently
 // exact.
+//
+// Antimeridian seam fix: the UV derivative spikes at the atan2 wraparound,
+// causing the GPU to pick a near-flattened high mip level exactly along the
+// seam. We now compute derivatives manually and zero out the u-component
+// spike, so textureGrad samples the correct mip level everywhere.
 
 import * as THREE from 'three';
 import { geoRotation } from 'd3';
@@ -41,8 +46,8 @@ const FULLER_ROTATION_MATRIX = computeFullerRotationMatrix();
 
 // ── Polar-safe shader: lon/lat computed per fragment ───────────────────
 const POLAR_SAFE_VERTEX_SHADER = `
-  attribute vec3 aSpherePos;
-  varying vec3 vSpherePos;
+  in vec3 aSpherePos;
+  out vec3 vSpherePos;
   void main() {
     vSpherePos = aSpherePos;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -54,7 +59,8 @@ const POLAR_SAFE_FRAGMENT_SHADER = `
   uniform sampler2D map;
   uniform mat3 fullerRotation;
   uniform float opacity;
-  varying vec3 vSpherePos;
+  in vec3 vSpherePos;
+  out vec4 outColor;
 
   void main() {
     vec3 p = normalize(fullerRotation * normalize(vSpherePos));
@@ -62,8 +68,19 @@ const POLAR_SAFE_FRAGMENT_SHADER = `
     float lon = atan(p.y, p.x);
     float u = (lon + 3.14159265358979) / 6.28318530717959;
     float v = (1.57079632679490 + lat) / 3.14159265358979;
-    vec4 texColor = texture2D(map, vec2(u, v));
-    gl_FragColor = vec4(texColor.rgb, texColor.a * opacity);
+    vec2 uv = vec2(u, v);
+
+    vec2 dx = dFdx(uv);
+    vec2 dy = dFdy(uv);
+    // atan2's wrap makes du/dx or du/dy spike to ~1.0 across the
+    // antimeridian even though neighboring fragments are a texel apart.
+    // Zero the spike so the seam column gets sampled like any other pixel
+    // instead of falling back to a near-flattened high mip level.
+    if (abs(dx.x) > 0.5) dx.x = 0.0;
+    if (abs(dy.x) > 0.5) dy.x = 0.0;
+
+    vec4 texColor = textureGrad(map, uv, dx, dy);
+    outColor = vec4(texColor.rgb, texColor.a * opacity);
   }
 `;
 
@@ -76,6 +93,7 @@ function createPolarSafeMaterial(texture: THREE.Texture, opacity: number): THREE
     },
     vertexShader: POLAR_SAFE_VERTEX_SHADER,
     fragmentShader: POLAR_SAFE_FRAGMENT_SHADER,
+    glslVersion: THREE.GLSL3,
     side: THREE.DoubleSide,
     transparent: false,
   });

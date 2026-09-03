@@ -170,3 +170,40 @@ export const FLAT: THREE.Vector3[][] = FLAT2D.map((f: Triangle2D) =>
     return new THREE.Vector3(rx * cosR - ry * sinR, rx * sinR + ry * cosR, 0);
   })
 );
+
+// ── Face subdivision barycentric weights ──────────────────────────────
+// 1-level midpoint subdivision splits each triangular face into 4 sub-triangles:
+//
+//         A
+//        / \
+//      mAB─mCA
+//      / \ / \
+//     B──mBC──C
+//
+// Sub-triangles (consistent winding):
+//   tri0: A,   mAB, mCA
+//   tri1: mAB, B,   mBC
+//   tri2: mCA, mBC, C
+//   tri3: mAB, mBC, mCA   ← centre (same winding as outer three)
+//
+// Non-indexed layout: 4 triangles × 3 vertices = 12 sub-vertices.
+// Each row is [w0, w1, w2] such that sub-vertex = w0*A + w1*B + w2*C.
+// These weights apply uniformly to positions, UVs, and control points.
+export const SUB_BARY: [number, number, number][] = [
+  // tri0: A, mAB, mCA
+  [1,   0,   0  ],
+  [0.5, 0.5, 0  ],
+  [0.5, 0,   0.5],
+  // tri1: mAB, B, mBC
+  [0.5, 0.5, 0  ],
+  [0,   1,   0  ],
+  [0,   0.5, 0.5],
+  // tri2: mCA, mBC, C
+  [0.5, 0,   0.5],
+  [0,   0.5, 0.5],
+  [0,   0,   1  ],
+  // tri3: mAB, mBC, mCA  (centre)
+  [0.5, 0.5, 0  ],
+  [0,   0.5, 0.5],
+  [0.5, 0,   0.5],
+];

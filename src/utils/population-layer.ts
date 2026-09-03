@@ -57,13 +57,14 @@ export function buildPopulationBuffers(samples: PopulationSample[]): PopulationB
     const cpC = vertexControlMap.get(vertexKey(sv[2]))!;
 
     const i3 = written * 3;
-    sphere[i3] = sv[0].x * wA + sv[1].x * wB + sv[2].x * wC;
-    sphere[i3 + 1] = sv[0].y * wA + sv[1].y * wB + sv[2].y * wC;
-    sphere[i3 + 2] = sv[0].z * wA + sv[1].z * wB + sv[2].z * wC;
+    const SPHERE_OFFSET = 1.003;
+    sphere[i3] = (sv[0].x * wA + sv[1].x * wB + sv[2].x * wC) * SPHERE_OFFSET;
+    sphere[i3 + 1] = (sv[0].y * wA + sv[1].y * wB + sv[2].y * wC) * SPHERE_OFFSET;
+    sphere[i3 + 2] = (sv[0].z * wA + sv[1].z * wB + sv[2].z * wC) * SPHERE_OFFSET;
 
     flat[i3] = fv[0].x * wA + fv[1].x * wB + fv[2].x * wC;
     flat[i3 + 1] = fv[0].y * wA + fv[1].y * wB + fv[2].y * wC;
-    flat[i3 + 2] = fv[0].z * wA + fv[1].z * wB + fv[2].z * wC;
+    flat[i3 + 2] = fv[0].z * wA + fv[1].z * wB + fv[2].z * wC + 0.003;
 
     ctrl[i3] = cpA.x * wA + cpB.x * wB + cpC.x * wC;
     ctrl[i3 + 1] = cpA.y * wA + cpB.y * wB + cpC.y * wC;
@@ -119,5 +120,7 @@ export function createPopulationPoints(
     opacity: options?.opacity ?? 0.35,
     depthWrite: false,
   });
-  return new THREE.Points(geometry, material);
+  const points = new THREE.Points(geometry, material);
+  points.renderOrder = 1;
+  return points;
 }

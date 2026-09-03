@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import {
-  SPHERE3D, SPHERE, FLAT, ease, bezier3, vertexKey, vertexControlMap, computeFaceT, NUM_FACES,
+  SPHERE3D, SPHERE, FLAT, ease, bezier3, vertexKey, vertexControlMap, computeFaceT, NUM_FACES, SUB_BARY,
 } from '@/utils/icosahedron-geometry';
 
 import {
@@ -89,25 +89,53 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       const faceT = computeFaceT(globalT, fi, NUM_FACES, STAGGER_RATIO);
       const et = ease(faceT);
 
-      const vertices: THREE.Vector3[] = [0, 1, 2].map((i: number) => {
-        const sphereVert = SPHERE[fi][i];
-        const flatVert = FLAT[fi][i];
-        const cp = vertexControlMap.get(vertexKey(sphereVert));
-        if (!cp) throw new Error('Control point not found');
-        return bezier3(sphereVert, flatVert, cp, et);
+      // Resolve the 3 corner bezier endpoints and control points once per face.
+      // Sub-vertices are barycentric blends of these — no extra map lookups needed.
+      const corners = ([0, 1, 2] as const).map((i) => {
+        const sphere = SPHERE[fi][i];
+        const flat   = FLAT[fi][i];
+        const cp = vertexControlMap.get(vertexKey(sphere));
+        if (!cp) throw new Error(`Control point not found for face ${fi} vertex ${i}`);
+        return { sphere, flat, cp };
       });
 
+      // ── Mesh: 12 sub-vertices (4 subdivided triangles, non-indexed) ──
+      // Each sub-vertex position is the bezier of its barycentric-blended
+      // sphere/flat/control points. The blend is linear so the sub-vertex
+      // rides exactly the same curved path as if it were an original corner.
       const posArray = meshes[fi].geometry.attributes.position.array as Float32Array;
-      vertices.forEach((v, i) => {
-        posArray[i * 3] = v.x;
+
+      SUB_BARY.forEach(([w0, w1, w2], i) => {
+        const spherePos = new THREE.Vector3(
+          w0 * corners[0].sphere.x + w1 * corners[1].sphere.x + w2 * corners[2].sphere.x,
+          w0 * corners[0].sphere.y + w1 * corners[1].sphere.y + w2 * corners[2].sphere.y,
+          w0 * corners[0].sphere.z + w1 * corners[1].sphere.z + w2 * corners[2].sphere.z,
+        );
+        const flatPos = new THREE.Vector3(
+          w0 * corners[0].flat.x + w1 * corners[1].flat.x + w2 * corners[2].flat.x,
+          w0 * corners[0].flat.y + w1 * corners[1].flat.y + w2 * corners[2].flat.y,
+          w0 * corners[0].flat.z + w1 * corners[1].flat.z + w2 * corners[2].flat.z,
+        );
+        const cpPos = new THREE.Vector3(
+          w0 * corners[0].cp.x + w1 * corners[1].cp.x + w2 * corners[2].cp.x,
+          w0 * corners[0].cp.y + w1 * corners[1].cp.y + w2 * corners[2].cp.y,
+          w0 * corners[0].cp.z + w1 * corners[1].cp.z + w2 * corners[2].cp.z,
+        );
+        const v = bezier3(spherePos, flatPos, cpPos, et);
+        posArray[i * 3]     = v.x;
         posArray[i * 3 + 1] = v.y;
         posArray[i * 3 + 2] = v.z;
       });
+
       meshes[fi].geometry.attributes.position.needsUpdate = true;
 
+      // ── Wire: 3 original corners only (outer triangle outline) ───────
+      // The wireframe shows the face boundary, which is defined by the
+      // original corners — subdivision doesn't change the outer edges.
       const wPosArray = wires[fi].geometry.attributes.position.array as Float32Array;
-      vertices.forEach((v, i) => {
-        wPosArray[i * 3] = v.x;
+      ([0, 1, 2] as const).forEach((i) => {
+        const v = bezier3(corners[i].sphere, corners[i].flat, corners[i].cp, et);
+        wPosArray[i * 3]     = v.x;
         wPosArray[i * 3 + 1] = v.y;
         wPosArray[i * 3 + 2] = v.z;
       });
@@ -132,16 +160,16 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       const rect = container.getBoundingClientRect();
       const w = width || rect.width;
       const h = height || rect.height;
-      
+
       canvas.width = w;
       canvas.height = h;
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
-      
+
       if (rendererRef.current) {
         rendererRef.current.setSize(w, h, false);
       }
-      
+
       if (cameraRef.current) {
         cameraRef.current.aspect = w / h;
         cameraRef.current.updateProjectionMatrix();
@@ -149,10 +177,10 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     };
 
     resizeCanvas();
-    
+
     const resizeObserver = new ResizeObserver(resizeCanvas);
     resizeObserver.observe(container);
-    
+
     return () => {
       resizeObserver.disconnect();
     };
@@ -182,13 +210,19 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     const meshes: THREE.Mesh[] = [];
     const wires: THREE.LineSegments[] = [];
     SPHERE3D.forEach((_, fi: number) => {
+      // ── Mesh geometry: 12 sub-vertices = 4 sub-triangles, non-indexed ──
+      // Float32Array(36): 12 vertices × 3 floats each.
+      // UVs are Float32Array(24): 12 vertices × 2 floats, set by applyFaceUVs.
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(36), 3));
       applyFaceUVs(geo, fi);
       const mesh = new THREE.Mesh(geo, faceMaterials[fi]);
+      mesh.renderOrder = 0;
       grp.add(mesh);
       meshes.push(mesh);
 
+      // ── Wire geometry: 3 original corners, indexed outline ────────────
+      // Unchanged from before — wireframe traces the outer triangle only.
       const wg = new THREE.BufferGeometry();
       wg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
       wg.setIndex([0, 1, 1, 2, 2, 0]);

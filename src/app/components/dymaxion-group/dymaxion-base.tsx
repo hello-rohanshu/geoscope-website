@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import * as THREE from "three";
 import IcosahedronGlobe from "./icosahedron-globe";
 import { loadRaster, isLoaded } from "@/utils/raster-engine";
 import { sampleRasterPresence, PopulationSample } from "@/utils/population-layer";
@@ -9,6 +10,14 @@ const RASTER_URL = "/population_2024_1440x720_cog.tif";
 export default function DymaxionBase() {
   const [showPopulation, setShowPopulation] = useState(true);
   const [samples, setSamples] = useState<PopulationSample[]>([]);
+  const [earthTexture, setEarthTexture] = useState<THREE.Texture | null>(null);
+
+  // Load earth texture on client only (fixes SSR/document error)
+  useEffect(() => {
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load("/earth_day.jpg");
+    setEarthTexture(tex);
+  }, []);
 
   useEffect(() => {
     (isLoaded() ? Promise.resolve(true) : loadRaster(RASTER_URL)).then((ok) => {
@@ -20,7 +29,19 @@ export default function DymaxionBase() {
     <div className="w-full min-h-screen p-4 sm:p-6 lg:p-8 flex flex-col xl:flex-row gap-6 lg:gap-8">
       <div className="flex flex-col gap-6 flex-[3] min-w-0">
         <div className="w-full flex-1 min-h-[500px] lg:min-h-[600px] rounded-2xl shadow-xl overflow-hidden border border-gray-700 bg-gray-900">
-          <IcosahedronGlobe populationSamples={samples} showPopulation={showPopulation} />
+          {earthTexture ? (
+            <IcosahedronGlobe
+              populationSamples={samples}
+              showPopulation={showPopulation}
+              baseLayer={{ mode: 'texture', texture: earthTexture }}
+            />
+          ) : (
+            <IcosahedronGlobe
+              populationSamples={samples}
+              showPopulation={showPopulation}
+              baseLayer={{ mode: 'debug' }}
+            />
+          )}
         </div>
         <div className="w-full h-24 bg-gray-800 rounded-lg border border-gray-600 p-4 flex items-center">
           <div className="w-full">

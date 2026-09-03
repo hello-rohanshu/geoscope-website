@@ -1,12 +1,17 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import {
-  SPHERE3D, SPHERE, FLAT, PAL, ease, bezier3, vertexKey, vertexControlMap, computeFaceT, NUM_FACES,
+  SPHERE3D, SPHERE, FLAT, ease, bezier3, vertexKey, vertexControlMap, computeFaceT, NUM_FACES,
 } from '@/utils/icosahedron-geometry';
 
 import {
   PopulationBuffers, PopulationSample, buildPopulationBuffers, updatePopulationPositions, createPopulationPoints,
 } from '@/utils/population-layer';
+
+import {
+  createFaceMaterials, applyFaceUVs,
+  type BaseLayerMode, type FaceMaterialsOptions,
+} from '@/utils/face-materials';
 
 
 // ──────────────────────────── CONFIGURATION ────────────────────────────
@@ -33,6 +38,7 @@ interface IcosahedronGlobeProps {
   populationColor?: string;
   populationSize?: number;
   populationOpacity?: number;
+  baseLayer?: FaceMaterialsOptions;
 }
 
 const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
@@ -47,6 +53,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   populationColor,
   populationSize,
   populationOpacity,
+  baseLayer = { mode: 'debug' },
   ...canvasProps
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -170,18 +177,15 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     scene.add(grp);
     groupRef.current = grp;
 
+    const faceMaterials = createFaceMaterials(baseLayer);
+
     const meshes: THREE.Mesh[] = [];
     const wires: THREE.LineSegments[] = [];
     SPHERE3D.forEach((_, fi: number) => {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
-      const mat = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(PAL[fi] || '#8AA0CC'),
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.88,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
+      applyFaceUVs(geo, fi);
+      const mesh = new THREE.Mesh(geo, faceMaterials[fi]);
       grp.add(mesh);
       meshes.push(mesh);
 
@@ -234,10 +238,24 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       canvas.removeEventListener('mouseup', onMouseUp);
       populationPointsRef.current?.geometry.dispose();
       (populationPointsRef.current?.material as THREE.Material | undefined)?.dispose();
+      meshesRef.current.forEach(m => {
+        m.geometry.dispose();
+        (m.material as THREE.Material).dispose();
+      });
       renderer.dispose();
       scene.clear();
     };
   }, [width, height, toggle, updateGeometry]);
+
+  // Hot-swap materials when baseLayer prop changes (e.g., texture finishes loading)
+  useEffect(() => {
+    if (!meshesRef.current.length) return;
+    const newMaterials = createFaceMaterials(baseLayer);
+    meshesRef.current.forEach((mesh, fi) => {
+      (mesh.material as THREE.Material).dispose();
+      mesh.material = newMaterials[fi];
+    });
+  }, [baseLayer]);
 
   // Build (or rebuild) the population layer whenever the sample set changes
   useEffect(() => {

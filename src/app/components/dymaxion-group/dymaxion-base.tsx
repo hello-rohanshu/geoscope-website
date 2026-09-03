@@ -14,8 +14,10 @@ export default function DymaxionBase() {
   useEffect(() => {
     const loader = new THREE.TextureLoader();
     const tex = loader.load("/earth_day.jpg");
-    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true;
     tex.needsUpdate = true;
     setEarthTexture(tex);
   }, []);

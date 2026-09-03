@@ -50,7 +50,7 @@ const POLAR_SAFE_VERTEX_SHADER = `
 `;
 
 const POLAR_SAFE_FRAGMENT_SHADER = `
-  precision mediump float;
+  precision highp float;
   uniform sampler2D map;
   uniform mat3 fullerRotation;
   uniform float opacity;
@@ -77,7 +77,7 @@ function createPolarSafeMaterial(texture: THREE.Texture, opacity: number): THREE
     vertexShader: POLAR_SAFE_VERTEX_SHADER,
     fragmentShader: POLAR_SAFE_FRAGMENT_SHADER,
     side: THREE.DoubleSide,
-    transparent: true,
+    transparent: false,
   });
 }
 

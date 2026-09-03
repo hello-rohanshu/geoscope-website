@@ -191,14 +191,14 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100);
-    camera.position.set(0, 0, 5.6);
+    camera.position.set(0, 0, 4.2);
     cameraRef.current = camera;
 
     const grp = new THREE.Group();
@@ -231,6 +231,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
         transparent: true,
         opacity: 0.3,
       }));
+      wire.visible = false;
       grp.add(wire);
       wires.push(wire);
     });

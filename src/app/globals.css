@@ -5,14 +5,19 @@
   --font-body: var(--font-body-next);
   --font-display: var(--font-display-next);
 
-  /* Design tokens (dark mode default) */
-  --color-bg: #0a0a0a;
-  --color-surface: #262626;
-  --color-accent: #60a5fa;
+  /* Design tokens (Strict Minimalist / Dark Dashboard) */
+  --color-bg: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-hover: #171717;
+  --color-border: #262626;
+  
+  --color-accent: #ffffff;
   --color-text: #ededed;
-  --color-text-muted: #a3a3a3;
+  --color-text-muted: #8a8a8a;
 
   --space-unit: 4px;
+  
+  /* Global corner radius */
   --radius: 8px;
 
   /* Legacy aliases */
@@ -22,45 +27,58 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --color-bg: #ffffff;
-    --color-surface: #f5f5f5;
-    --color-accent: #3b82f6;
+    --color-bg: #f5f5f5;
+    --color-surface: #ffffff;
+    --color-surface-hover: #e5e5e5;
+    --color-border: #d4d4d4;
+    
+    --color-accent: #000000;
     --color-text: #171717;
-    --color-text-muted: #737373;
+    --color-text-muted: #525252;
   }
 }
 
-/* Apply fonts globally */
+/* Apply base styles globally */
+* {
+  border-radius: var(--radius);
+}
+
 body {
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-body), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display), sans-serif;
 }
 
-/* Scrollbar custom design classes */
+/* 
+  Scrollbar custom design classes 
+  Updated for a sharp, minimal dashboard look 
+*/
 .scrollbar-custom::-webkit-scrollbar {
-  width: 12px;
+  width: 6px;
   height: 6px;
-  border-radius: 5px !important;
 }
 
 .scrollbar-custom::-webkit-scrollbar-track {
-  background: rgba(118, 118, 118, 0.1);
-  border-radius: 5px !important;
+  background: var(--color-bg);
+  border-left: 1px solid var(--color-border);
 }
 
 .scrollbar-custom::-webkit-scrollbar-thumb {
-  background-color: rgba(75, 85, 99, 0.6);
-  background-repeat: no-repeat;
-  border-radius: 5px !important;
-  background-clip: padding-box;
+  background-color: var(--color-border);
+  border-radius: 0px;
 }
 
-/* Hide scrollbar */
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-muted);
+}
+
+/* Hide scrollbar completely */
 .scrollbar-hidden::-webkit-scrollbar {
   display: none;
 }

@@ -1,4 +1,4 @@
-import { Inter as BodyFont, Space_Grotesk as DisplayFont } from 'next/font/google'
+import { Inter as BodyFont, MuseoModerno as DisplayFont } from 'next/font/google'
 
 export const fontBody = BodyFont({
     subsets: ['latin'],

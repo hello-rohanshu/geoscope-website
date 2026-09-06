@@ -1,89 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  /* Map design tokens to Next.js font variables */
-  --font-body: var(--font-body-next);
-  --font-display: var(--font-display-next);
+  /* Fonts */
+  --font-body: var(--font-body-next, 'Inter', sans-serif);
+  --font-display: var(--font-display-next, 'Space Grotesk', sans-serif);
 
-  /* Design tokens (Strict Minimalist / Dark Dashboard) */
-  --color-bg: #000000;
-  --color-surface: #0a0a0a;
-  --color-surface-hover: #171717;
-  --color-border: #262626;
+  /* Matte Metal Palette (Dark) */
+  --color-bg: transparent;         /* Lets the 3D scene show through */
+  --color-surface: #121315;        /* Deep graphite */
+  --color-surface-elevated: #1a1b1e; /* Lighter titanium */
   
-  --color-accent: #ffffff;
-  --color-text: #ededed;
-  --color-text-muted: #8a8a8a;
-
-  --space-unit: 4px;
+  --color-accent: #7c878e;         /* Brushed steel / slate */
+  --color-progress: #94a3b8;       /* Confident, brightened aluminum */
   
-  /* Global corner radius */
-  --radius: 8px;
+  --color-text: #e2e4e6;           /* Crisp ash white */
+  --color-text-summary: #b5bcc2;   /* Soft metallic text */
+  --color-text-muted: #6b7278;     /* Deep shadow text */
 
-  /* Legacy aliases */
   --background: var(--color-bg);
   --foreground: var(--color-text);
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --color-bg: #f5f5f5;
-    --color-surface: #ffffff;
-    --color-surface-hover: #e5e5e5;
-    --color-border: #d4d4d4;
+    /* Platinum / Aluminum Palette (Light) */
+    --color-surface: #f4f5f6;
+    --color-surface-elevated: #ffffff;
     
-    --color-accent: #000000;
-    --color-text: #171717;
-    --color-text-muted: #525252;
+    --color-accent: #64748b;
+    --color-progress: #475569;
+    
+    --color-text: #1e2022;
+    --color-text-summary: #334155;
+    --color-text-muted: #64748b;
   }
-}
-
-/* Apply base styles globally */
-* {
-  border-radius: var(--radius);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-body), sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display), sans-serif;
+  font-family: var(--font-display);
 }
 
-/* 
-  Scrollbar custom design classes 
-  Updated for a sharp, minimal dashboard look 
-*/
-.scrollbar-custom::-webkit-scrollbar {
+/* Confident, ultra-minimal scrollbar */
+.scrollbar-matte::-webkit-scrollbar {
   width: 6px;
-  height: 6px;
 }
-
-.scrollbar-custom::-webkit-scrollbar-track {
-  background: var(--color-bg);
-  border-left: 1px solid var(--color-border);
+.scrollbar-matte::-webkit-scrollbar-track {
+  background: var(--color-surface);
 }
-
-.scrollbar-custom::-webkit-scrollbar-thumb {
-  background-color: var(--color-border);
-  border-radius: 0px;
+.scrollbar-matte::-webkit-scrollbar-thumb {
+  background-color: var(--color-surface-elevated);
+  border-radius: 0px; 
 }
-
-.scrollbar-custom::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-text-muted);
-}
-
-/* Hide scrollbar completely */
-.scrollbar-hidden::-webkit-scrollbar {
-  display: none;
-}
-
-.scrollbar-hidden {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.scrollbar-matte::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-accent);
 }

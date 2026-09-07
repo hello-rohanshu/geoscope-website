@@ -2,28 +2,31 @@
 
 :root {
   /* Fonts */
-  --font-body: var(--font-body-next, 'Inter', sans-serif);
+  --font-body: var(--font-body-next, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
   --font-display: var(--font-display-next, 'Space Grotesk', sans-serif);
   --font-mono: var(--font-mono-next, 'Geist Mono', monospace);
 
-  /* Muted Earth & Dusk Palette (Dark) */
-  --color-bg: transparent;
-  --color-surface: #131518;
-  /* Charcoal slate */
-  --color-surface-elevated: #1c1f24;
-  /* Deep steel */
+  /* Dark Mode Palette (Default) */
+  --color-bg: #0d0e11;
+  --color-surface: #15181e;
+  --color-surface-elevated: #1e222a;
+  --color-border: rgba(255, 255, 255, 0.08);
 
-  --color-accent: #8d9b81;
-  /* Muted sage green */
-  --color-progress: #7289a2;
-  /* Muted dusk blue */
+  --color-accent: #92a288;
+  --color-progress: #4f6e8d;
+  --color-progress-track: #090a0c;
 
-  --color-text: #e3e5e8;
-  /* Ash white */
-  --color-text-summary: #a3a1ad;
-  /* Muted taupe grey */
-  --color-text-muted: #686d76;
-  /* Deep shadow grey */
+  --color-text: #f0f2f5;
+  --color-text-summary: #b3bac5;
+  --color-text-muted: #788190;
+
+  --color-header-text: #f0f2f5;
+  --color-header-muted: #8a94a6;
+
+  --color-overlay: rgba(13, 14, 17, 0.75);
+  --color-overlay-text: #f0f2f5;
+
+  --color-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
 
   --background: var(--color-bg);
   --foreground: var(--color-text);
@@ -31,19 +34,27 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    /* Muted Earth & Dusk Palette (Light) */
-    --color-surface-elevated: #f2f3f5;
+    /* Light Mode Palette */
+    --color-bg: #f3f4f6;
     --color-surface: #ffffff;
+    --color-surface-elevated: #eef1f5;
+    --color-border: rgba(0, 0, 0, 0.08);
 
+    --color-accent: #485c41;
+    --color-progress: #3a5670;
+    --color-progress-track: #dce1e8;
 
-    --color-accent: #5e6e53;
-    /* Deep muted olive */
-    --color-progress: #49627a;
-    /* Deep muted dusk blue */
+    --color-text: #121518;
+    --color-text-summary: #3c434e;
+    --color-text-muted: #606875;
 
-    --color-text: #191c20;
-    --color-text-summary: #4a4d55;
-    --color-text-muted: #6f7480;
+    --color-header-text: #ffffff;
+    --color-header-muted: #a0aab8;
+
+    --color-overlay: rgba(255, 255, 255, 0.85);
+    --color-overlay-text: #121518;
+
+    --color-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.08);
   }
 }
 
@@ -55,18 +66,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
 }
 
-/* Scrollbar */
+/* Custom Scrollbar */
 .scrollbar-matte::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .scrollbar-matte::-webkit-scrollbar-track {
@@ -75,7 +81,7 @@ h6 {
 
 .scrollbar-matte::-webkit-scrollbar-thumb {
   background-color: var(--color-surface-elevated);
-  border-radius: 0px;
+  border-radius: 2px;
 }
 
 .scrollbar-matte::-webkit-scrollbar-thumb:hover {

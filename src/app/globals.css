@@ -4,18 +4,26 @@
   /* Fonts */
   --font-body: var(--font-body-next, 'Inter', sans-serif);
   --font-display: var(--font-display-next, 'Space Grotesk', sans-serif);
+  --font-mono: var(--font-mono-next, 'Geist Mono', monospace);
 
-  /* Matte Metal Palette (Dark) */
-  --color-bg: transparent;         /* Lets the 3D scene show through */
-  --color-surface: #121315;        /* Deep graphite */
-  --color-surface-elevated: #1a1b1e; /* Lighter titanium */
-  
-  --color-accent: #7c878e;         /* Brushed steel / slate */
-  --color-progress: #94a3b8;       /* Confident, brightened aluminum */
-  
-  --color-text: #e2e4e6;           /* Crisp ash white */
-  --color-text-summary: #b5bcc2;   /* Soft metallic text */
-  --color-text-muted: #6b7278;     /* Deep shadow text */
+  /* Muted Earth & Dusk Palette (Dark) */
+  --color-bg: transparent;
+  --color-surface: #131518;
+  /* Charcoal slate */
+  --color-surface-elevated: #1c1f24;
+  /* Deep steel */
+
+  --color-accent: #8d9b81;
+  /* Muted sage green */
+  --color-progress: #7289a2;
+  /* Muted dusk blue */
+
+  --color-text: #e3e5e8;
+  /* Ash white */
+  --color-text-summary: #a3a1ad;
+  /* Muted taupe grey */
+  --color-text-muted: #686d76;
+  /* Deep shadow grey */
 
   --background: var(--color-bg);
   --foreground: var(--color-text);
@@ -23,16 +31,19 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    /* Platinum / Aluminum Palette (Light) */
-    --color-surface: #f4f5f6;
-    --color-surface-elevated: #ffffff;
-    
-    --color-accent: #64748b;
-    --color-progress: #475569;
-    
-    --color-text: #1e2022;
-    --color-text-summary: #334155;
-    --color-text-muted: #64748b;
+    /* Muted Earth & Dusk Palette (Light) */
+    --color-surface-elevated: #f2f3f5;
+    --color-surface: #ffffff;
+
+
+    --color-accent: #5e6e53;
+    /* Deep muted olive */
+    --color-progress: #49627a;
+    /* Deep muted dusk blue */
+
+    --color-text: #191c20;
+    --color-text-summary: #4a4d55;
+    --color-text-muted: #6f7480;
   }
 }
 
@@ -44,21 +55,29 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
 }
 
-/* Confident, ultra-minimal scrollbar */
+/* Scrollbar */
 .scrollbar-matte::-webkit-scrollbar {
   width: 6px;
 }
+
 .scrollbar-matte::-webkit-scrollbar-track {
   background: var(--color-surface);
 }
+
 .scrollbar-matte::-webkit-scrollbar-thumb {
   background-color: var(--color-surface-elevated);
-  border-radius: 0px; 
+  border-radius: 0px;
 }
+
 .scrollbar-matte::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-accent);
 }

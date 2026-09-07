@@ -25,7 +25,7 @@ The small isolated groups of humanity were utterly unaware of one another’s ex
     image: "/humans-early-ok.jpg",
     tags: ["fromHumanity"],
     dateMode: "calendar",
-    dateValue: "-3500",
+    dateValue: "-300000",
   },
   {
     title: "Boats",
@@ -38,7 +38,7 @@ The change was the shift over from armed-horsemen-escorted, overland caravanning
     image: "/humans-boat-bad.jpg",
     tags: ["fromHumanity"],
     dateMode: "calendar",
-    dateValue: "-3000",
+    dateValue: "-50000",
   },
   {
     title: "Outlaws",
@@ -51,7 +51,7 @@ They realized that if the other powerful pirates did not know where you were goi
     image: "/human-big-boat-2-gemini-ok.jpg",
     tags: ["fromHumanity"],
     dateMode: "calendar",
-    dateValue: "-2000",
+    dateValue: "-1300",
   },
   {
     title: "Anticipatory Divide and Conquer",

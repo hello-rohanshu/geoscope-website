@@ -2,14 +2,28 @@
 
 import { useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Stars } from '@react-three/drei';
+import { OrbitControls, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
+
+function StarfieldSphere() {
+  const texture = useTexture('/stars.jpg');
+
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 6);
+
+  return (
+    <mesh>
+      <sphereGeometry args={[500, 64, 64]} />
+      <meshBasicMaterial map={texture} side={THREE.BackSide} />
+    </mesh>
+  );
+}
 
 function SceneContent() {
   const meshRef = useRef<THREE.Mesh>(null!);
   const { camera, size, raycaster, gl } = useThree();
 
-  // Restrict orbit initiation to the globe only
   useEffect(() => {
     const domEl = gl.domElement;
 
@@ -22,7 +36,7 @@ function SceneContent() {
       const intersects = raycaster.intersectObject(meshRef.current);
 
       if (intersects.length === 0) {
-        e.stopImmediatePropagation(); // Block OrbitControls if click is outside globe
+        e.stopImmediatePropagation();
       }
     };
 
@@ -32,6 +46,7 @@ function SceneContent() {
 
   useFrame(() => {
     const perspectiveCam = camera as THREE.PerspectiveCamera;
+
     const scrollOffset = window.scrollY - size.height;
 
     perspectiveCam.setViewOffset(
@@ -49,7 +64,7 @@ function SceneContent() {
       <ambientLight intensity={0.2} />
       <directionalLight position={[5, 3, 5]} intensity={1.5} />
 
-      <Stars radius={500} depth={10} count={2000} factor={28} saturation={999} fade speed={0} />
+      <StarfieldSphere />
 
       <mesh ref={meshRef} position={[0, 0, 0]}>
         <icosahedronGeometry args={[2, 0]} />

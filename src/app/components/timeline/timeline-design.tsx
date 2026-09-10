@@ -58,8 +58,6 @@ function formatDate(event: TimelineEvent): string {
   return start;
 }
 
-// ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
-
 // ─── NAV BUTTON COMPONENT ───────────────────────────────────────────────────
 
 function NavBtn({ onClick, label, children }: { onClick: () => void; label: string; children: React.ReactNode }) {
@@ -179,41 +177,18 @@ export default function HumanityTimeline() {
 
   return (
     <>
-      <style>{`
-        @keyframes subtleSlideUp {
-          0% { opacity: 0; transform: translateY(4px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-content-delayed {
-          opacity: 0;
-          animation: subtleSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
-
       <div className="sr-only" aria-live="polite">
         Event {idx + 1} of {timelineData.length}: {event.title}, {formatDate(event)}
       </div>
 
-      <div className="w-full min-h-[100svh] flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 lg:p-12 box-border pointer-events-none">
-
+      <div className="w-full flex flex-col items-center pointer-events-auto">
         {/* Header */}
-        <div className="w-full max-w-[880px] mb-3 md:mb-4 flex items-end justify-between pointer-events-auto shrink-0">
+        <div className="w-full mb-3 md:mb-4 flex items-end justify-between shrink-0">
           <div className="flex flex-col gap-0.5">
-            <h1
-              className="text-xl md:text-3xl tracking-tight m-0"
-              style={{ color: "var(--color-header-text, #ffffff)", fontFamily: "var(--font-display)" }}
-            >
-              Story of Humanity
-            </h1>
-            {/* <p
-              className="text-xs md:text-xs tracking-wider m-0 opacity-90 font-body"
-              style={{ color: "var(--color-header-muted, #a0aab8)" }}
-            >
-              From the writings of R. Buckminster Fuller
-            </p> */}
+            <h1 className="title-section">Brief Story of Humanity</h1>
           </div>
 
-          <div className="flex items-center gap-1 font-body">
+          <div className="flex items-center gap-1">
             <NavBtn onClick={prev} label="Previous event (Left Arrow)">←</NavBtn>
             <NavBtn onClick={next} label="Next event (Right Arrow)">→</NavBtn>
           </div>
@@ -221,7 +196,7 @@ export default function HumanityTimeline() {
 
         {/* Outer Card Wrapper */}
         <div
-          className="w-full max-w-[880px] md:max-w-[720px] lg:max-w-[880px] h-[520px] md:h-[450px] lg:h-[460px] flex flex-col relative z-10 pointer-events-auto overflow-hidden"
+          className="w-full h-[520px] md:h-[450px] lg:h-[460px] flex flex-col relative z-10 overflow-hidden"
           style={{
             background: "var(--color-surface)",
             boxShadow: "var(--color-shadow)",
@@ -260,7 +235,7 @@ export default function HumanityTimeline() {
                   color: "var(--color-overlay-text)",
                 }}
               >
-                <span className="text-[11px] md:text-xs tracking-widest font-body opacity-90">
+                <span className="text-[11px] md:text-xs font-medium tracking-widest uppercase opacity-90">
                   {idx + 1} / {timelineData.length}
                 </span>
               </div>
@@ -270,39 +245,31 @@ export default function HumanityTimeline() {
             <div className="flex-1 w-full min-h-0 lg:h-full lg:w-1/2 flex flex-col relative overflow-hidden bg-[var(--color-surface)]">
               <div
                 ref={contentRef}
-                key={`story-${idx}`}
-                className="animate-content-delayed flex-1 overflow-y-auto px-5 py-4 md:px-7 md:py-6 scrollbar-matte"
+                className="flex-1 min-h-0 overflow-y-auto px-5 py-4 md:px-7 md:py-6 scrollbar-matte"
               >
-                <h2
-                  className="text-base md:text-lg lg:text-xl font-semibold leading-snug tracking-tight mb-3"
-                  style={{ color: "var(--color-text)", fontFamily: "var(--font-body)" }}
-                >
-                  {event.title}
-                </h2>
+                <div key={`story-${idx}`} className="animate-content-delayed">
+                  <h2 className="title-card mb-3" style={{ color: "var(--color-text)" }}>
+                    {event.title}
+                  </h2>
 
-                {event.summary && (
-                  <div
-                    className="p-3 mb-3"
-                    style={{
-                      // background: "var(--color-surface-elevated)",
-                      // borderColor: "var(--color-accent)",
-                    }}
+                  {event.summary && (
+                    <div className="p-3 mb-3">
+                      <p
+                        className="text-sm md:text-sm leading-relaxed font-medium opacity-90 m-0"
+                        style={{ color: "var(--color-text-summary)" }}
+                      >
+                        {event.summary}
+                      </p>
+                    </div>
+                  )}
+
+                  <p
+                    className="text-sm md:text-sm leading-relaxed whitespace-pre-line"
+                    style={{ color: "var(--color-text-muted)" }}
                   >
-                    <p
-                      className="text-xs md:text-sm leading-relaxed font-medium opacity-90 m-0"
-                      style={{ color: "var(--color-text-summary)" }}
-                    >
-                      {event.summary}
-                    </p>
-                  </div>
-                )}
-
-                <p
-                  className="text-[12px] md:text-[13px] leading-relaxed whitespace-pre-line"
-                  style={{ color: "var(--color-text-muted)" }}
-                >
-                  {event.story}
-                </p>
+                    {event.story}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -318,7 +285,7 @@ export default function HumanityTimeline() {
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(pctRaw)}
-            className="w-full h-8 md:h-9 shrink-0 relative overflow-hidden z-20 flex items-center justify-center select-none font-body cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-accent)]"
+            className="w-full h-8 md:h-9 shrink-0 relative overflow-hidden z-20 flex items-center justify-center select-none cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-accent)]"
             style={{
               background: "var(--color-progress-track)",
             }}

@@ -49,7 +49,7 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="relative min-h-[400vh] text-white overflow-x-hidden">
+    <main className="relative text-white overflow-x-hidden">
 
       {/* Screen 1 */}
       <Section className="relative z-20">

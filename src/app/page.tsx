@@ -3,7 +3,7 @@
 import { useEffect, ReactNode } from 'react';
 import Lenis from 'lenis';
 import GeoscopeCanvas from '@/app/components/GeoscopeCanvas';
-import HumanityTimeline from '@/app/components/timeline/timeline-design';
+import HumanityTimeline from '@/app/components/timeline/humanity-timeline';
 import GeoscopeTitleCard from '@/app/components/title-card';
 import DomainPanels from '@/app/components/domain-panels';
 import DesignScienceProgress from '@/app/components/design-science-progress'; // Add this import

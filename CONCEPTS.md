@@ -8,7 +8,10 @@ We have four main categories, apparently:
 - Culture: are people globally harmonious or fighting
 - Science: are people educated in the real sense of that word or just have have a certificate
 
-
+- Earth systems > Fuel gauge portal (do we have the fuel to keep going?)
+- Standard of life > Life support portal (essential, basic life non-dying processes)
+- Culture > Crew harmony portal (is the crew on the spaceship fighting amongst itself? or working together?)
+- Science > Navigation (do people know the most basic truths of life we know of today?)
 
 ---
 IDEAS

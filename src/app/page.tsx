@@ -6,27 +6,7 @@ import GeoscopeCanvas from '@/app/components/GeoscopeCanvas';
 import HumanityTimeline from '@/app/components/timeline/humanity-timeline';
 import GeoscopeTitleCard from '@/app/components/title-card';
 import DomainPanels from '@/app/components/domain-panels';
-import DesignScienceProgress from '@/app/components/design-science-progress'; // Add this import
-
-// Reusable glassmorphism card component
-function GlassCard({
-  title,
-  children,
-  className = '',
-}: {
-  title?: string;
-  children?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`pointer-events-auto rounded-lg border border-white/20 bg-black/60 p-5 backdrop-blur-md ${className}`}
-    >
-      {title && <h2 className="text-base font-semibold">{title}</h2>}
-      {children}
-    </div>
-  );
-}
+import DesignScienceProgress from '@/app/components/design-science-progress';
 
 // Reusable full-screen layout wrapper providing site-wide boundary/padding
 function Section({
@@ -52,7 +32,7 @@ export default function Home() {
     const lenis = new Lenis({
       duration: 1.6,
       smoothWheel: true,
-      allowNestedScroll: true, // Enables native scrolling on all nested scroll containers globally
+      allowNestedScroll: true,
     });
 
     let rafId: number;
@@ -79,18 +59,16 @@ export default function Home() {
       <Section className="">
         <GeoscopeCanvas />
       </Section>
-    
 
       {/* Screen 3 */}
       <Section className="relative z-20">
         <HumanityTimeline />
       </Section>
 
-            {/* Screen 2 - Design Science Progress */}
+      {/* Screen 2 - Design Science Progress */}
       <Section className="relative z-20">
         <DesignScienceProgress />
       </Section>
-
 
       {/* Screen 5 - Above in z-axis */}
       <Section className="relative z-20">

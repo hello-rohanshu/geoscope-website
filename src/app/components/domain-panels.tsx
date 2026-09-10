@@ -17,13 +17,13 @@ const domainPanelsData: DomainPanel[] = [
 
 export const DomainPanels: React.FC = () => {
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 md:p-6 pointer-events-auto">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+    <div className="min-h-screen w-full max-w-5xl mx-auto p-8 md:p-16 flex items-center justify-center pointer-events-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 w-full">
         {domainPanelsData.map((card, idx) => (
           <a
             key={idx}
             href={card.href}
-            className="group aspect-square w-full flex flex-col justify-between p-5 md:p-6 rounded-none outline-none transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-[var(--color-accent)] cursor-pointer select-none"
+            className="group aspect-square md:aspect-[4/3] w-full flex flex-col justify-between p-6 md:p-8 rounded-none outline-none transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-[var(--color-accent)] cursor-pointer select-none"
             style={{
               background: "var(--color-surface)",
               boxShadow: "var(--color-shadow)",
@@ -35,7 +35,7 @@ export const DomainPanels: React.FC = () => {
               e.currentTarget.style.background = "var(--color-surface)";
             }}
           >
-            {/* Header: Secondary Tag & Link Indicator */}
+            {/* Header */}
             <div className="flex items-center justify-between gap-2">
               <span className="text-overline font-medium truncate">
                 {card.secondaryHeading}
@@ -48,7 +48,7 @@ export const DomainPanels: React.FC = () => {
               </span>
             </div>
 
-            {/* Placeholder Area for Future Data */}
+            {/* Data Placeholder */}
             <div
               className="my-auto w-full h-1/2 flex items-center justify-center opacity-40 transition-opacity group-hover:opacity-75"
               style={{ background: "var(--color-progress-track)" }}
@@ -61,7 +61,7 @@ export const DomainPanels: React.FC = () => {
               </span>
             </div>
 
-            {/* Footer: Main Title */}
+            {/* Footer */}
             <div>
               <h3
                 className="text-lg md:text-xl font-semibold tracking-tight transition-colors duration-200 m-0"

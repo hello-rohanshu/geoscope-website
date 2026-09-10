@@ -18,7 +18,7 @@ const milestones: Milestone[] = [
 function HexNut({ completed }: { completed: boolean }) {
   return (
     <svg 
-      className="w-12 h-12 xs:w-14 xs:h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 shrink-0 select-none z-10 relative" 
+      className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 shrink-0 select-none z-10 relative drop-shadow-sm" 
       viewBox="0 0 64 64"
     >
       {/* Outer Hexagon */}
@@ -49,7 +49,7 @@ function HexNut({ completed }: { completed: boolean }) {
 
 export default function DesignScienceProgress() {
   return (
-    <div className="w-full min-h-[360px] sm:min-h-[480px] md:min-h-[560px] flex flex-col justify-between py-6 sm:py-12 md:py-20 px-4 sm:px-6 pointer-events-auto bg-transparent overflow-hidden">
+    <div className="w-full min-h-[480px] sm:min-h-[500px] md:min-h-[560px] flex flex-col justify-between py-8 sm:py-12 md:py-20 px-5 sm:px-6 pointer-events-auto bg-transparent overflow-hidden">
       {/* Continuous Pulse Animations */}
       <style>{`
         @keyframes singlePassPulseHorizontal {
@@ -76,12 +76,12 @@ export default function DesignScienceProgress() {
       `}</style>
 
       {/* Header */}
-      <div className="w-full text-left mb-6 sm:mb-0">
-        <h1 className="title-section">Design Science Revolution</h1>
+      <div className="w-full text-left mb-8 sm:mb-0">
+        <h1 className="title-section text-xl sm:text-2xl font-bold tracking-tight">Design Science Revolution</h1>
       </div>
 
-      {/* Pipeline & Stepper: Switches to Vertical on mobile (< sm) & Horizontal on tablets+ (>= sm) */}
-      <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-6 sm:gap-0 my-auto">
+      {/* Pipeline & Stepper */}
+      <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-12 sm:gap-0 my-auto">
         {milestones.map((m, idx) => {
           const isNextActive =
             idx < milestones.length - 1 &&
@@ -100,16 +100,16 @@ export default function DesignScienceProgress() {
                   <>
                     {/* Horizontal Pipe (sm screens and above) */}
                     <div
-                      className={`hidden sm:block absolute left-1/2 w-full h-2 sm:h-2.5 md:h-3.5 top-1/2 -translate-y-1/2 z-0 overflow-hidden ${
+                      className={`hidden sm:block absolute left-1/2 w-full h-2.5 md:h-3.5 top-1/2 -translate-y-1/2 z-0 overflow-hidden ${
                         isNextActive ? 'bg-emerald-500' : 'bg-slate-800'
                       }`}
                     >
                       {isNextActive && <div className="animate-continuous-pulse" />}
                     </div>
 
-                    {/* Vertical Pipe (mobile screens) */}
+                    {/* Vertical Pipe (mobile screens) - Extended height to match gap-12 */}
                     <div
-                      className={`sm:hidden absolute top-1/2 left-1/2 -translate-x-1/2 w-2 h-[calc(100%+2.5rem)] z-0 overflow-hidden ${
+                      className={`sm:hidden absolute top-1/2 left-1/2 -translate-x-1/2 w-3.5 h-[calc(100%+4.5rem)] z-0 overflow-hidden ${
                         isNextActive ? 'bg-emerald-500' : 'bg-slate-800'
                       }`}
                     >
@@ -124,8 +124,8 @@ export default function DesignScienceProgress() {
 
               {/* Label */}
               <h2 
-                className={`title-card transition-colors duration-300 pl-4 sm:pl-0 sm:px-2 md:px-3 text-left sm:text-center ${
-                  m.completed || m.active ? 'text-white' : 'text-slate-600'
+                className={`title-card text-base sm:text-lg font-semibold transition-colors duration-300 pl-5 sm:pl-0 sm:px-2 md:px-3 text-left sm:text-center leading-snug ${
+                  m.completed || m.active ? 'text-white' : 'text-slate-500'
                 }`}
               >
                 {m.label}

@@ -1,81 +1,101 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, ReactNode } from 'react';
 import Lenis from 'lenis';
 import GeoscopeCanvas from '@/app/components/GeoscopeCanvas';
+import HumanityTimeline from '@/app/components/timeline/timeline-design';
+import GeoscopeTitleCard from '@/app/components/title-card';
+import DomainPanels from '@/app/components/domain-panels';
+import DesignScienceProgress from '@/app/components/design-science-progress'; // Add this import
 
-function DummyBefore() {
+// Reusable glassmorphism card component
+function GlassCard({
+  title,
+  children,
+  className = '',
+}: {
+  title?: string;
+  children?: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="pointer-events-none relative z-10 flex min-h-screen items-center justify-center p-8">
-      <div className="pointer-events-auto max-w-xs rounded-lg border border-white/20 bg-black/60 p-5 backdrop-blur-md">
-        <h2 className="text-base font-semibold">Dummy Component Before</h2>
-        <p className="mt-2 text-xs text-white/70">
-          First component (shape is scrolled below this screen).
-        </p>
-      </div>
+    <div
+      className={`pointer-events-auto rounded-lg border border-white/20 bg-black/60 p-5 backdrop-blur-md ${className}`}
+    >
+      {title && <h2 className="text-base font-semibold">{title}</h2>}
+      {children}
     </div>
   );
 }
 
-function DummyAfter() {
+// Reusable full-screen layout wrapper providing site-wide boundary/padding
+function Section({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="pointer-events-none relative z-10 flex min-h-screen items-center justify-center p-8">
-      <div className="pointer-events-auto max-w-xs rounded-lg border border-white/20 bg-black/60 p-5 backdrop-blur-md">
-        <h2 className="text-base font-semibold">Dummy Component After</h2>
-        <p className="mt-2 text-xs text-white/70">
-          A card component placed after Screen 2.
-        </p>
+    <section
+      className={`pointer-events-none relative z-10 flex min-h-[100svh] w-full items-center justify-center px-10 sm:px-12 md:px-16 lg:px-24 py-8 ${className}`}
+    >
+      <div className="w-full max-w-7xl flex items-center justify-center z-20">
+        {children}
       </div>
-    </div>
+    </section>
   );
 }
 
 export default function Home() {
   useEffect(() => {
     const lenis = new Lenis({
-      duration: 1.2,
+      duration: 1.6,
       smoothWheel: true,
+      allowNestedScroll: true, // Enables native scrolling on all nested scroll containers globally
     });
 
+    let rafId: number;
     function raf(time: number) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
+    rafId = requestAnimationFrame(raf);
 
-    requestAnimationFrame(raf);
-    return () => lenis.destroy();
+    return () => {
+      cancelAnimationFrame(rafId);
+      lenis.destroy();
+    };
   }, []);
 
   return (
-    <main className="relative min-h-[400vh] text-white">
-      <GeoscopeCanvas />
+    <main className="relative min-h-[400vh] text-white overflow-x-hidden">
 
-      {/* Screen 0: First Component */}
-      <DummyBefore />
+      {/* Screen 1 */}
+      <Section className="relative z-20">
+        <DomainPanels />
+      </Section>
 
-      {/* Screen 1: Shape appears here */}
-      <div className="pointer-events-none relative z-10 flex min-h-screen flex-col justify-between p-8">
-        <header className="flex flex-col items-center gap-4 text-center">
-          <h1 className="text-3xl font-bold tracking-wider">GEOSCOPE</h1>
-          <div className="pointer-events-auto rounded-lg border border-white/20 bg-black/40 p-4 backdrop-blur-md">
-            <p className="text-sm">Main Controls / Status</p>
-          </div>
-        </header>
-        <div className="text-center text-xs text-white/50">Scroll down ↓</div>
-      </div>
-
-      {/* Screen 2 */}
-      <div className="pointer-events-none relative z-10 flex min-h-screen items-center justify-center p-8">
-        <div className="pointer-events-auto max-w-xs rounded-lg border border-white/20 bg-black/60 p-5 backdrop-blur-md">
-          <h2 className="text-base font-semibold">Sensory Framework</h2>
-          <p className="mt-2 text-xs text-white/70">
-            A secondary card component anchored down the page.
-          </p>
-        </div>
-      </div>
+      <Section className="">
+        <GeoscopeCanvas />
+      </Section>
+    
 
       {/* Screen 3 */}
-      <DummyAfter />
+      <Section className="relative z-20">
+        <HumanityTimeline />
+      </Section>
+
+            {/* Screen 2 - Design Science Progress */}
+      <Section className="relative z-20">
+        <DesignScienceProgress />
+      </Section>
+
+
+      {/* Screen 5 - Above in z-axis */}
+      <Section className="relative z-20">
+        <GeoscopeTitleCard />
+      </Section>
     </main>
   );
 }

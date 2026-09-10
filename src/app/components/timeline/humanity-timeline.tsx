@@ -68,7 +68,7 @@ function NavBtn({ onClick, label, children }: { onClick: () => void; label: stri
       aria-label={label}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="h-8 w-8 md:h-9 md:w-9 flex items-center justify-center text-base md:text-lg transition-colors duration-200 cursor-pointer outline-none select-none focus-visible:ring-1 focus-visible:ring-[var(--color-accent)]"
+      className="h-8 w-8 md:h-9 md:w-9 lg:h-11 lg:w-11 flex items-center justify-center text-base md:text-lg lg:text-xl transition-colors duration-200 cursor-pointer outline-none select-none focus-visible:ring-1 focus-visible:ring-[var(--color-accent)] shrink-0"
       style={{
         color: hover ? "var(--color-header-text, #ffffff)" : "var(--color-header-muted, #a0aab8)",
         background: hover ? "var(--color-surface-elevated)" : "transparent",
@@ -90,6 +90,7 @@ export default function HumanityTimeline() {
 
   const prevImg = useRef("");
   const contentRef = useRef<HTMLDivElement>(null);
+  const imgElRef = useRef<HTMLImageElement | null>(null);
   const event = timelineData[idx];
 
   const prev = useCallback(() => setIdx((i) => (i > 0 ? i - 1 : timelineData.length - 1)), []);
@@ -97,7 +98,8 @@ export default function HumanityTimeline() {
 
   useEffect(() => {
     if (prevImg.current !== event.image) {
-      setImgLoaded(false);
+      const node = imgElRef.current;
+      setImgLoaded(Boolean(node && node.complete && node.naturalWidth > 0));
       prevImg.current = event.image || "";
     }
   }, [event.image]);
@@ -183,12 +185,12 @@ export default function HumanityTimeline() {
 
       <div className="w-full flex flex-col items-center pointer-events-auto">
         {/* Header */}
-        <div className="w-full mb-3 md:mb-4 flex items-end justify-between shrink-0">
+        <div className="w-full mb-3 md:mb-4 flex items-center justify-between shrink-0">
           <div className="flex flex-col gap-0.5">
             <h1 className="title-section">Brief Story of Humanity</h1>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 lg:gap-2">
             <NavBtn onClick={prev} label="Previous event (Left Arrow)">←</NavBtn>
             <NavBtn onClick={next} label="Next event (Right Arrow)">→</NavBtn>
           </div>
@@ -219,6 +221,7 @@ export default function HumanityTimeline() {
               )}
               {event.image && (
                 <img
+                  ref={imgElRef}
                   src={event.image}
                   alt={event.title}
                   onLoad={() => setImgLoaded(true)}

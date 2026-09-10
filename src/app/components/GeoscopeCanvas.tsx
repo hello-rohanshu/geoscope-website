@@ -47,7 +47,7 @@ function SceneContent() {
   useFrame(() => {
     const perspectiveCam = camera as THREE.PerspectiveCamera;
 
-    const scrollOffset = window.scrollY - size.height;
+    const scrollOffset = window.scrollY; // - size.height to move it one step below and multiply by x to move x steps below
 
     perspectiveCam.setViewOffset(
       size.width,

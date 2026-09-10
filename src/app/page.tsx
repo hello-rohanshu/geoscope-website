@@ -18,7 +18,7 @@ function Section({
 }) {
   return (
     <section
-      className={`pointer-events-none relative z-10 flex min-h-[100svh] w-full items-center justify-center px-10 sm:px-12 md:px-16 lg:px-24 py-8 ${className}`}
+      className={`pointer-events-none relative z-10 flex min-h-[100svh] w-full items-center justify-center px-10 sm:px-12 md:px-16 lg:px-24 py-8 border-4 border-white ${className}`}
     >
       <div className="w-full max-w-7xl flex items-center justify-center z-20">
         {children}
@@ -51,29 +51,26 @@ export default function Home() {
   return (
     <main className="relative text-white overflow-x-hidden">
 
-      {/* Screen 1 */}
+      <Section className="-z-10">
+        <GeoscopeCanvas />
+      </Section>
+
       <Section className="relative z-20">
         <DomainPanels />
       </Section>
 
-      <Section className="">
-        <GeoscopeCanvas />
-      </Section>
-
-      {/* Screen 3 */}
       <Section className="relative z-20">
         <HumanityTimeline />
       </Section>
 
-      {/* Screen 2 - Design Science Progress */}
       <Section className="relative z-20">
         <DesignScienceProgress />
       </Section>
 
-      {/* Screen 5 - Above in z-axis */}
       <Section className="relative z-20">
         <GeoscopeTitleCard />
       </Section>
+
     </main>
   );
 }

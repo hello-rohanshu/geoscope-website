@@ -1,18 +1,44 @@
 // utils/icosahedron-geometry.ts
-// Single source of truth for the 24-face icosahedron/Dymaxion net.
-// IcosahedronGlobe (mesh rendering) and lonLatToFaceUV (data placement)
-// both import from here so the two can never drift apart.
+//
+// Single source of truth for the 24-face icosahedron / Dymaxion net.
+//
+// Two consumers import from this file and must never drift apart:
+//   • icosahedron-globe.tsx  — renders the animated 3D mesh + wireframe
+//   • lonLatToFaceUV.ts      — places geographic data onto faces
+//
+// Anything that describes "where a face is" or "how a face is subdivided"
+// belongs here, not in the consumers. If you find yourself hardcoding a
+// face count, a vertex count, or a sub-vertex layout somewhere else,
+// it's a bug — add it here and import it.
 
 import * as THREE from 'three';
 
+// ── Calibration constants ─────────────────────────────────────────────
+// Fuller's Dymaxion orientation, in degrees. Applied to the 2D flat net
+// so the icosahedron's own singular vertices land in oceans rather than
+// on populated land. See face-materials.ts for the shader-side handling.
 export const MAP_ROTATION_DEG = 120;
+
+// How far (in unit-sphere radii) each corner's bezier control point is
+// pushed outward along its own normal during the icosahedron→dymaxion
+// fold. Controls how "ballooned" the intermediate fold looks.
 export const FLARE_AMOUNT = 0.7;
 
+// ── Shared types ──────────────────────────────────────────────────────
 export type Triangle3D = [[number, number, number], [number, number, number], [number, number, number]];
 export type Point2D = [number, number];
 export type Triangle2D = [Point2D, Point2D, Point2D];
 
-// ── 3D globe (icosahedron with coplanar split vertices) ───────────────
+// ── 3D globe: the 24-face icosahedron (unit-sphere corner coordinates) ─
+// Every face is a triangle with three corners at radius 1.0. Faces are
+// duplicated at shared edges ("coplanar split vertices") so each face
+// owns its own copy — this lets per-face attributes (e.g. aSpherePos)
+// live on a non-indexed BufferGeometry without sharing.
+//
+// IMPORTANT: The order of these faces is load-bearing. PAL[] below is
+// indexed by face number, as is FACE_SPHERE_POSITIONS, as is every
+// per-face material the renderer builds. Reordering this array silently
+// recolours the globe and misaligns textures.
 export const SPHERE3D: Triangle3D[] = [
   [[0, 0, 1], [0.7236068, 0.5257311, 0.4472136], [0.7236068, -0.5257311, 0.4472136]],
   [[0, 0, 1], [-0.2763932, 0.8506508, 0.4472136], [0.7236068, 0.5257311, 0.4472136]],
@@ -40,9 +66,17 @@ export const SPHERE3D: Triangle3D[] = [
   [[0.5854102, -0.4253254, -0.4472136], [0, 0, -1], [0.2763932, -0.8506508, -0.4472136]],
 ];
 
+// Derived from the array, not a literal — makes it impossible to add a
+// face above without every downstream consumer picking it up automatically.
 export const NUM_FACES = SPHERE3D.length;
 
-// ── 2D net (repositioned to share edges correctly) ────────────────────
+// ── 2D net: the Dymaxion flat layout ─────────────────────────────────
+// These are the flat-map coordinates BEFORE the calibration rotation and
+// the fit-to-viewport scale (both applied below when constructing FLAT).
+// The raw numbers are hand-authored so shared edges between faces sit
+// exactly on top of each other — which is why a few entries reference
+// named points (f14_A, f15_centroid, …) rather than writing the pair out
+// again. If you move one, move its partner.
 const sqrt3: number = Math.sqrt(3);
 const h: number = sqrt3 / 2;
 
@@ -70,6 +104,9 @@ const f21: Triangle2D = [f15_parentApex, f15_A, f15_centroid];
 const f22_free: Point2D = [2.0, 0.57735];
 const f23: Triangle2D = [[2.0, -0.288675], [2.0, -1.154701], [2.5, -0.288675]];
 
+// One flat triangle per SPHERE3D entry, in the same order. Index parity
+// between the two arrays is what makes per-face lookup work everywhere
+// else in the codebase — do not reorder one without the other.
 export const FLAT2D: Triangle2D[] = [
   [[-0.500000, -0.288675], [0.500000, -0.288675], [0.000000, 0.577350]],
   [[-0.500000, -0.288675], [0.000000, -1.154701], [0.500000, -0.288675]],
@@ -97,7 +134,11 @@ export const FLAT2D: Triangle2D[] = [
   f23,
 ];
 
-// ── Colour palette ────────────────────────────────────────────────────
+// ── Per-face debug colours ────────────────────────────────────────────
+// Indexed by face number. 24 entries, one per SPHERE3D triangle. The
+// '#8AA0CC' fallback in createFaceMaterials handles an out-of-range
+// lookup, but if you add faces above, add colours here too or you'll
+// see the fallback repeated.
 export const PAL: string[] = [
   '#4A90D9', '#5BA85A', '#3AABBF', '#4A90D9', '#5BA85A',
   '#7DC46B', '#6CAF8E', '#5C8FD9', '#8AA0CC', '#7DC46B',
@@ -106,9 +147,17 @@ export const PAL: string[] = [
   '#E8A838', '#E87050', '#E87050', '#E8A838', '#E8A838',
 ];
 
-// ── Utility: ease, quadratic bezier, per-face stagger ──────────────────
+// ── Easing, bezier, per-face stagger ──────────────────────────────────
+// Quadratic ease-in-out on [0, 1]. Used to soften the start and end of
+// each segment transition so the fold doesn't "snap" at the joins.
 export const ease = (t: number): number => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
 
+/**
+ * Quadratic Bezier: P0 (start) → P1 (end), pulled toward control C.
+ * Note this is a QUADRATIC bezier (one control point), not cubic —
+ * that's why the flare uses a single vertexControlMap entry per corner
+ * instead of a pair of handles.
+ */
 export const bezier3 = (P0: THREE.Vector3, P1: THREE.Vector3, C: THREE.Vector3, t: number): THREE.Vector3 => {
   const mt = 1 - t;
   const a = mt * mt;
@@ -121,7 +170,14 @@ export const bezier3 = (P0: THREE.Vector3, P1: THREE.Vector3, C: THREE.Vector3, 
   );
 };
 
-/** Same stagger formula as the mesh update loop — shared so data points fold in sync with faces. */
+/**
+ * Per-face stagger. With staggerRatio=0 all faces animate in lockstep;
+ * with staggerRatio>0 faces start their transition at slightly different
+ * global times, producing a "wave" across the mesh. Both the mesh update
+ * loop in icosahedron-globe.tsx AND updatePopulationPositions() call this,
+ * so data points fold in sync with their host faces instead of trailing
+ * or leading them.
+ */
 export function computeFaceT(globalT: number, faceIndex: number, numFaces: number, staggerRatio: number): number {
   const staggerStep = staggerRatio / (numFaces - 1);
   const oneMinusStagger = 1 - staggerRatio;
@@ -129,15 +185,28 @@ export function computeFaceT(globalT: number, faceIndex: number, numFaces: numbe
   return Math.max(0, Math.min(1, rawT));
 }
 
-// ── Vertex key helper (for dedup + control-point lookup) ───────────────
+// ── Vertex identity + flare control points ────────────────────────────
+// SPHERE3D stores each shared edge corner twice (once per adjacent face,
+// "coplanar split vertices"). To treat them as the same physical point
+// we hash the rounded coordinates. Rounding to 1e-5 is tight enough to
+// keep distinct vertices distinct and loose enough to absorb the decimal
+// noise in the hand-authored literals.
 export const vertexKey = (v: THREE.Vector3): string =>
   `${Math.round(v.x * 1e5)},${Math.round(v.y * 1e5)},${Math.round(v.z * 1e5)}`;
 
-// ── Build sphere vertex array & flare control points ────────────────────
+// Face-corner positions as THREE.Vector3 for consumers that prefer them
+// over the raw number triples. Same indexing as SPHERE3D.
 export const SPHERE: THREE.Vector3[][] = SPHERE3D.map((f: Triangle3D) =>
   f.map(([x, y, z]: [number, number, number]) => new THREE.Vector3(x, y, z))
 );
 
+// One bezier control point per UNIQUE corner position. Two corners that
+// hash to the same vertexKey share the same control point — this is what
+// keeps shared edges from splitting apart during the fold.
+//
+// The control point sits FLARE_AMOUNT further out along the corner's
+// own unit normal, so the mid-fold shape bulges outward like an inflated
+// balloon before settling into the flat net.
 export const vertexControlMap = new Map<string, THREE.Vector3>();
 SPHERE3D.forEach((face: Triangle3D) => {
   face.forEach((coord: [number, number, number]) => {
@@ -151,7 +220,11 @@ SPHERE3D.forEach((face: Triangle3D) => {
   });
 });
 
-// ── Build flat target (centered, scaled, rotated) ─────────────────────
+// ── FLAT: the Dymaxion net in world space ────────────────────────────
+// FLAT2D → FLAT pipeline: (1) recentre on the net's centroid, (2) scale
+// so the largest half-extent hits 1.65, (3) flip Y (2D y-down → 3D y-up),
+// (4) rotate by -MAP_ROTATION_DEG around Z to get Fuller's calibration.
+// Z is always 0: the flat net lies in the XY plane at the end of the fold.
 let cx = 0, cy = 0, n = 0;
 FLAT2D.forEach((f) => f.forEach(([x, y]) => { cx += x; cy += y; n++; }));
 cx /= n; cy /= n;
@@ -171,8 +244,34 @@ export const FLAT: THREE.Vector3[][] = FLAT2D.map((f: Triangle2D) =>
   })
 );
 
+// ── Subdivision level ─────────────────────────────────────────────────
+// How many times each triangular face is split along each edge. Every
+// face becomes N² sub-triangles, all sharing the outer A→B→C winding.
+//
+//    N=1 →   1 sub-tri/face (  24 total) — the raw icosahedron, polygonal
+//    N=2 →   4 sub-tris/face ( 96 total) — visibly polygonal silhouette
+//    N=4 →  16 sub-tris/face (384 total) ← current, minimum smooth silhouette
+//    N=8 →  64 sub-tris/face (1536 total) — safe, well past the visible
+//                                           angular-resolution threshold
+//
+// Changing this one constant updates BOTH SUB_BARY and
+// FACE_SPHERE_POSITIONS, which is the whole point — they are a coupled
+// invariant (same sub-vertices, same order) and desyncing them produces
+// geometry that LOOKS right while its textures are silently wrong. Do
+// not edit either array independently; edit this constant and let both
+// regenerate.
+export const SUBDIVISION_LEVEL = 8;
+
 // ── Face subdivision barycentric weights ──────────────────────────────
-// 1-level midpoint subdivision splits each triangular face into 4 sub-triangles:
+// SUB_BARY is a flat list of triangle corners: every three consecutive
+// entries form one sub-triangle, non-indexed. Each entry is a barycentric
+// triple [w0, w1, w2] meaning sub-vertex = w0·A + w1·B + w2·C, where
+// A/B/C are the parent face's three corners.
+//
+// Length is SUBDIVISION_LEVEL² × 3:
+//    N=4 →  48 entries (16 sub-tris × 3 verts each)
+//
+// Base case (N=2) is the classic 1-level midpoint split:
 //
 //         A
 //        / \
@@ -180,40 +279,65 @@ export const FLAT: THREE.Vector3[][] = FLAT2D.map((f: Triangle2D) =>
 //      / \ / \
 //     B──mBC──C
 //
-// Sub-triangles (consistent winding):
 //   tri0: A,   mAB, mCA
 //   tri1: mAB, B,   mBC
 //   tri2: mCA, mBC, C
 //   tri3: mAB, mBC, mCA   ← centre (same winding as outer three)
 //
-// Non-indexed layout: 4 triangles × 3 vertices = 12 sub-vertices.
-// Each row is [w0, w1, w2] such that sub-vertex = w0*A + w1*B + w2*C.
-// These weights apply uniformly to positions, UVs, and control points.
-export const SUB_BARY: [number, number, number][] = [
-  // tri0: A, mAB, mCA
-  [1,   0,   0  ],
-  [0.5, 0.5, 0  ],
-  [0.5, 0,   0.5],
-  // tri1: mAB, B, mBC
-  [0.5, 0.5, 0  ],
-  [0,   1,   0  ],
-  [0,   0.5, 0.5],
-  // tri2: mCA, mBC, C
-  [0.5, 0,   0.5],
-  [0,   0.5, 0.5],
-  [0,   0,   1  ],
-  // tri3: mAB, mBC, mCA  (centre)
-  [0.5, 0.5, 0  ],
-  [0,   0.5, 0.5],
-  [0.5, 0,   0.5],
-];
+// General N: lay an N×N barycentric grid over the face. Each grid cell
+// splits into an upward triangle and a downward triangle, both winding
+// A→B→C:
+//
+//   Index:    P(i, j) = [ (N-i-j)/N , i/N , j/N ]
+//   Upward:   P(i,j),   P(i+1,j),   P(i,j+1)
+//   Downward: P(i+1,j), P(i+1,j+1), P(i,j+1)
+//
+// These weights apply uniformly to positions, control points, and any
+// future per-vertex attribute — because every consumer treats a
+// sub-vertex as a linear blend of the parent corners, the same bary
+// triple works everywhere.
+function makeSubBary(N: number): [number, number, number][] {
+  const out: [number, number, number][] = [];
+  const P = (i: number, j: number): [number, number, number] =>
+    [(N - i - j) / N, i / N, j / N];
 
-// ── Per-face sub-vertex positions on the UNIT SPHERE (static) ─────────
-// Doesn't change with fold animation. Used as a custom vertex attribute so
-// the polar-safe texture shader can compute exact lon/lat per pixel instead
-// of interpolating baked-per-vertex UVs (see face-materials.ts).
+  // Upward-pointing triangles (base along the i-axis).
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j <= N - 1 - i; j++) {
+      out.push(P(i, j), P(i + 1, j), P(i, j + 1));
+    }
+  }
+  // Downward-pointing triangles, filling the remaining half of each cell.
+  for (let i = 0; i < N - 1; i++) {
+    for (let j = 0; j <= N - 2 - i; j++) {
+      out.push(P(i + 1, j), P(i + 1, j + 1), P(i, j + 1));
+    }
+  }
+  return out;
+}
+
+export const SUB_BARY: [number, number, number][] = makeSubBary(SUBDIVISION_LEVEL);
+
+// ── Per-face sub-vertex positions on the unit sphere (static) ────────
+// FACE_SPHERE_POSITIONS[fi] is a flat Float32Array of length
+// SUB_BARY.length × 3, holding each sub-vertex's UNNORMALISED position:
+// the barycentric blend of the face's three raw SPHERE3D corner coords.
+//
+// Two important properties:
+//
+//   1. It is COUPLED to SUB_BARY by index. Entry k of SUB_BARY describes
+//      the same sub-vertex as floats [3k, 3k+1, 3k+2] here. Both are
+//      generated from SUBDIVISION_LEVEL, so they cannot drift. Never
+//      hand-edit one without regenerating the other.
+//
+//   2. It does NOT change with fold animation — it's the smooth-sphere
+//      reference, not the current animated position. Consumers attach it
+//      as a per-vertex attribute (aSpherePos) so the polar-safe texture
+//      shader can compute exact lon/lat per fragment instead of
+//      interpolating baked-per-vertex UVs, which would be wrong on the
+//      two faces whose interiors contain a geographic pole.
 export const FACE_SPHERE_POSITIONS: Float32Array[] = SPHERE3D.map((face) => {
-  const arr = new Float32Array(36);
+  const arr = new Float32Array(SUB_BARY.length * 3);
   SUB_BARY.forEach(([w0, w1, w2], i) => {
     arr[i * 3]     = w0 * face[0][0] + w1 * face[1][0] + w2 * face[2][0];
     arr[i * 3 + 1] = w0 * face[0][1] + w1 * face[1][1] + w2 * face[2][1];
@@ -222,9 +346,21 @@ export const FACE_SPHERE_POSITIONS: Float32Array[] = SPHERE3D.map((face) => {
   return arr;
 });
 
-// ── Multi-stage animation model ────────────────────────────────────────
-// 0 = smooth sphere · 1 = smooth sphere + icosa triangulation
-// 2 = icosahedron (faceted, = old t=0) · 3 = dymaxion (flat net, = old t=1)
+// ── Multi-stage animation model ───────────────────────────────────────
+// The globe animates continuously through four discrete "stages"; the
+// `stage` prop on IcosahedronGlobe is a float in [0, SEGMENT_COUNT] and
+// fractional values scrub within a segment.
+//
+//   0  SPHERE               smooth subdivided sphere (no wireframe)
+//   1  SPHERE_TRIANGULATED  same sphere, wireframe fades in
+//   2  ICOSAHEDRON          sphere inflates outward into flat facets
+//   3  DYMAXION             facets unfold into the flat net
+//
+// Subdivision (SUB_BARY / FACE_SPHERE_POSITIONS) only affects stages 0
+// and 1 — the mesh there is drawn from SUB_BARY sub-vertices. Stages 2
+// and 3 use only the 3 original SPHERE3D corners per face (sub-vertices
+// collapse onto the corners as the fold progresses). The wireframe is
+// ALWAYS drawn from the 3 original corners regardless of stage.
 export const GLOBE_STAGES = {
   SPHERE: 0,
   SPHERE_TRIANGULATED: 1,
@@ -235,7 +371,13 @@ export const GLOBE_STAGES = {
 export const STAGE_COUNT = 4;
 export const SEGMENT_COUNT = STAGE_COUNT - 1;
 
-/** Splits a continuous 0..SEGMENT_COUNT stage value into an active segment + local 0..1 progress. */
+/**
+ * Split a continuous stage value into (a) which of the three animation
+ * segments is active, and (b) the local 0..1 progress within that segment.
+ *
+ * Example: globalStageT = 1.4 → { segment: 1, localT: 0.4 } meaning
+ * "40% of the way through the sphere→icosahedron inflation".
+ */
 export function resolveSegment(globalStageT: number): { segment: number; localT: number } {
   const clamped = Math.max(0, Math.min(SEGMENT_COUNT, globalStageT));
   const segment = Math.min(SEGMENT_COUNT - 1, Math.floor(clamped));

@@ -252,7 +252,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     const wires: THREE.LineSegments[] = [];
     SPHERE3D.forEach((_, fi: number) => {
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(36), 3));
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SUB_BARY.length * 3), 3));
       applyFaceSphereAttribute(geo, fi);
       const mesh = new THREE.Mesh(geo, faceMaterials[fi]);
       mesh.renderOrder = 0;

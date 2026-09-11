@@ -221,3 +221,23 @@ export const FACE_SPHERE_POSITIONS: Float32Array[] = SPHERE3D.map((face) => {
   });
   return arr;
 });
+
+// ── Multi-stage animation model ────────────────────────────────────────
+// 0 = smooth sphere · 1 = smooth sphere + icosa triangulation
+// 2 = icosahedron (faceted, = old t=0) · 3 = dymaxion (flat net, = old t=1)
+export const GLOBE_STAGES = {
+  SPHERE: 0,
+  SPHERE_TRIANGULATED: 1,
+  ICOSAHEDRON: 2,
+  DYMAXION: 3,
+} as const;
+
+export const STAGE_COUNT = 4;
+export const SEGMENT_COUNT = STAGE_COUNT - 1;
+
+/** Splits a continuous 0..SEGMENT_COUNT stage value into an active segment + local 0..1 progress. */
+export function resolveSegment(globalStageT: number): { segment: number; localT: number } {
+  const clamped = Math.max(0, Math.min(SEGMENT_COUNT, globalStageT));
+  const segment = Math.min(SEGMENT_COUNT - 1, Math.floor(clamped));
+  return { segment, localT: clamped - segment };
+}

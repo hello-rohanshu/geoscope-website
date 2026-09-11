@@ -4,7 +4,10 @@
 // fold/unfold bezier — no Vector3 allocation in the per-frame hot loop.
 
 import * as THREE from 'three';
-import { SPHERE, FLAT, vertexControlMap, vertexKey, ease, computeFaceT, NUM_FACES } from './icosahedron-geometry';
+import {
+  SPHERE, FLAT, vertexControlMap, vertexKey, ease, computeFaceT, NUM_FACES,
+  resolveSegment,
+} from './icosahedron-geometry';
 import { lonLatToFaceUV } from './lonLatToFaceUV';
 import { getRasterDimensions, getValueAtIndex, getLonLatForIndex } from './raster-engine';
 
@@ -15,14 +18,15 @@ export interface PopulationSample {
 
 export interface PopulationBuffers {
   count: number;
-  sphere: Float32Array; // xyz per point
+  smoothSphere: Float32Array; // smooth-sphere anchor: barycentric blend normalized × 1.003
+  sphere: Float32Array;       // faceted anchor: barycentric blend × 1.003
   flat: Float32Array;
   ctrl: Float32Array;
   faceIndex: Uint8Array;
-  positions: Float32Array; // live buffer, fed to BufferGeometry
+  positions: Float32Array;
 }
 
-/** Pull every raster cell with value > 0 into plain lon/lat samples — same "true presence" test as before. */
+/** Pull every raster cell with value > 0 into plain lon/lat samples. */
 export function sampleRasterPresence(maxSamples = Infinity): PopulationSample[] {
   const { width, height } = getRasterDimensions();
   const total = width * height;
@@ -35,19 +39,22 @@ export function sampleRasterPresence(maxSamples = Infinity): PopulationSample[] 
   return samples;
 }
 
-/** One-time cost: resolve every sample to a face + barycentric weights, then bake the three animation anchors (sphere/flat/control) as flat typed arrays. */
+/** One-time: resolve every sample to a face + barycentric weights, bake all four anchors. */
 export function buildPopulationBuffers(samples: PopulationSample[]): PopulationBuffers {
   const count = samples.length;
+  const smoothSphere = new Float32Array(count * 3);
   const sphere = new Float32Array(count * 3);
   const flat = new Float32Array(count * 3);
   const ctrl = new Float32Array(count * 3);
   const faceIndex = new Uint8Array(count);
   const positions = new Float32Array(count * 3);
 
+  const SPHERE_OFFSET = 1.003;
+
   let written = 0;
   for (const { lon, lat } of samples) {
     const placement = lonLatToFaceUV(lon, lat);
-    if (!placement) continue; // not expected to trigger — defensive only
+    if (!placement) continue;
 
     const [wA, wB, wC] = placement.weights;
     const sv = SPHERE[placement.faceIndex];
@@ -57,16 +64,28 @@ export function buildPopulationBuffers(samples: PopulationSample[]): PopulationB
     const cpC = vertexControlMap.get(vertexKey(sv[2]))!;
 
     const i3 = written * 3;
-    const SPHERE_OFFSET = 1.003;
-    sphere[i3] = (sv[0].x * wA + sv[1].x * wB + sv[2].x * wC) * SPHERE_OFFSET;
-    sphere[i3 + 1] = (sv[0].y * wA + sv[1].y * wB + sv[2].y * wC) * SPHERE_OFFSET;
-    sphere[i3 + 2] = (sv[0].z * wA + sv[1].z * wB + sv[2].z * wC) * SPHERE_OFFSET;
 
-    flat[i3] = fv[0].x * wA + fv[1].x * wB + fv[2].x * wC;
+    // Barycentric blend of the raw sphere corners = the faceted "chord" point.
+    const bx = sv[0].x * wA + sv[1].x * wB + sv[2].x * wC;
+    const by = sv[0].y * wA + sv[1].y * wB + sv[2].y * wC;
+    const bz = sv[0].z * wA + sv[1].z * wB + sv[2].z * wC;
+
+    // Faceted anchor — chord point pushed out along its own direction.
+    sphere[i3]     = bx * SPHERE_OFFSET;
+    sphere[i3 + 1] = by * SPHERE_OFFSET;
+    sphere[i3 + 2] = bz * SPHERE_OFFSET;
+
+    // Smooth-sphere anchor — same chord point re-projected onto the sphere.
+    const bl = Math.sqrt(bx * bx + by * by + bz * bz) || 1;
+    smoothSphere[i3]     = (bx / bl) * SPHERE_OFFSET;
+    smoothSphere[i3 + 1] = (by / bl) * SPHERE_OFFSET;
+    smoothSphere[i3 + 2] = (bz / bl) * SPHERE_OFFSET;
+
+    flat[i3]     = fv[0].x * wA + fv[1].x * wB + fv[2].x * wC;
     flat[i3 + 1] = fv[0].y * wA + fv[1].y * wB + fv[2].y * wC;
     flat[i3 + 2] = fv[0].z * wA + fv[1].z * wB + fv[2].z * wC + 0.003;
 
-    ctrl[i3] = cpA.x * wA + cpB.x * wB + cpC.x * wC;
+    ctrl[i3]     = cpA.x * wA + cpB.x * wB + cpC.x * wC;
     ctrl[i3 + 1] = cpA.y * wA + cpB.y * wB + cpC.y * wC;
     ctrl[i3 + 2] = cpA.z * wA + cpB.z * wB + cpC.z * wC;
 
@@ -74,10 +93,12 @@ export function buildPopulationBuffers(samples: PopulationSample[]): PopulationB
     written++;
   }
 
-  // If any samples were dropped, trim the typed arrays to the written length.
-  if (written === count) return { count, sphere, flat, ctrl, faceIndex, positions };
+  if (written === count) {
+    return { count, smoothSphere, sphere, flat, ctrl, faceIndex, positions };
+  }
   return {
     count: written,
+    smoothSphere: smoothSphere.slice(0, written * 3),
     sphere: sphere.slice(0, written * 3),
     flat: flat.slice(0, written * 3),
     ctrl: ctrl.slice(0, written * 3),
@@ -86,23 +107,43 @@ export function buildPopulationBuffers(samples: PopulationSample[]): PopulationB
   };
 }
 
-/** Per-frame: write animated positions straight into the typed array — no allocation. Caller sets geometry.attributes.position.needsUpdate = true afterward. */
+/**
+ * Per-frame: write animated positions straight into the typed array — no allocation.
+ * Mirrors the mesh's 3-segment branch exactly:
+ *   segment 0: static smooth sphere
+ *   segment 1: smooth sphere lerp -> faceted anchor
+ *   segment 2: faceted anchor bezier -> dymaxion flat
+ */
 export function updatePopulationPositions(
   buffers: PopulationBuffers,
-  globalT: number,
+  globalStageT: number,
   staggerRatio: number,
   numFaces: number = NUM_FACES
 ): void {
-  const { count, sphere, flat, ctrl, faceIndex, positions } = buffers;
+  const { count, smoothSphere, sphere, flat, ctrl, faceIndex, positions } = buffers;
+  const { segment, localT } = resolveSegment(globalStageT);
+
   for (let i = 0; i < count; i++) {
-    const faceT = computeFaceT(globalT, faceIndex[i], numFaces, staggerRatio);
+    const faceT = computeFaceT(localT, faceIndex[i], numFaces, staggerRatio);
     const et = ease(faceT);
-    const mt = 1 - et;
-    const a = mt * mt, b = 2 * mt * et, c = et * et;
     const i3 = i * 3;
-    positions[i3] = a * sphere[i3] + b * ctrl[i3] + c * flat[i3];
-    positions[i3 + 1] = a * sphere[i3 + 1] + b * ctrl[i3 + 1] + c * flat[i3 + 1];
-    positions[i3 + 2] = a * sphere[i3 + 2] + b * ctrl[i3 + 2] + c * flat[i3 + 2];
+
+    if (segment === 0) {
+      positions[i3]     = smoothSphere[i3];
+      positions[i3 + 1] = smoothSphere[i3 + 1];
+      positions[i3 + 2] = smoothSphere[i3 + 2];
+    } else if (segment === 1) {
+      const mt = 1 - et;
+      positions[i3]     = mt * smoothSphere[i3]     + et * sphere[i3];
+      positions[i3 + 1] = mt * smoothSphere[i3 + 1] + et * sphere[i3 + 1];
+      positions[i3 + 2] = mt * smoothSphere[i3 + 2] + et * sphere[i3 + 2];
+    } else {
+      const mt = 1 - et;
+      const a = mt * mt, b = 2 * mt * et, c = et * et;
+      positions[i3]     = a * sphere[i3]     + b * ctrl[i3]     + c * flat[i3];
+      positions[i3 + 1] = a * sphere[i3 + 1] + b * ctrl[i3 + 1] + c * flat[i3 + 1];
+      positions[i3 + 2] = a * sphere[i3 + 2] + b * ctrl[i3 + 2] + c * flat[i3 + 2];
+    }
   }
 }
 

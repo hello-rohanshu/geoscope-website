@@ -5,13 +5,13 @@ import * as THREE from "three";
 import IcosahedronGlobe from "./icosahedron-globe";
 import { GLOBE_STAGES, SEGMENT_COUNT } from "@/utils/icosahedron-geometry";
 import { loadRaster, isLoaded } from "@/utils/raster-engine";
-import { sampleRasterPresence, PopulationSample } from "@/utils/population-layer";
+import { collectRasterSamples, OverlaySample } from "@/utils/overlay-layer";
 
 const RASTER_URL = "/population_2024_1440x720_cog.tif";
 
 export default function DymaxionBase() {
-  const [showPopulation, setShowPopulation] = useState(false); // ← off by default
-  const [samples, setSamples] = useState<PopulationSample[]>([]);
+  const [showOverlay, setShowOverlay] = useState(false); // ← off by default
+  const [samples, setSamples] = useState<OverlaySample[]>([]);
   const [earthTexture, setEarthTexture] = useState<THREE.Texture | null>(null);
   const [stage, setStage] = useState<number>(GLOBE_STAGES.SPHERE);
 
@@ -30,7 +30,7 @@ export default function DymaxionBase() {
   // Load population raster data
   useEffect(() => {
     (isLoaded() ? Promise.resolve(true) : loadRaster(RASTER_URL)).then((ok) => {
-      if (ok) setSamples(sampleRasterPresence());
+      if (ok) setSamples(collectRasterSamples());
     });
   }, []);
 
@@ -66,16 +66,16 @@ export default function DymaxionBase() {
             <IcosahedronGlobe
               stage={stage}
               onStageChange={setStage}
-              populationSamples={samples}
-              showPopulation={showPopulation}
+              overlaySamples={samples}
+              showOverlay={showOverlay}
               baseLayer={{ mode: 'texture', texture: earthTexture }}
             />
           ) : (
             <IcosahedronGlobe
               stage={stage}
               onStageChange={setStage}
-              populationSamples={samples}
-              showPopulation={showPopulation}
+              overlaySamples={samples}
+              showOverlay={showOverlay}
               baseLayer={{ mode: 'debug' }}
             />
           )}
@@ -100,8 +100,8 @@ export default function DymaxionBase() {
             <label className="flex items-center gap-3 text-gray-300 cursor-pointer select-none">
               <input
                 type="checkbox"
-                checked={showPopulation}
-                onChange={() => setShowPopulation(v => !v)}
+                checked={showOverlay}
+                onChange={() => setShowOverlay(v => !v)}
                 className="accent-red-500"
               />
               <span>Population</span>

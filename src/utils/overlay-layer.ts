@@ -1,4 +1,4 @@
-// utils/population-layer.ts
+// utils/overlay-layer.ts
 // Bulk path for rendering raster samples as a single THREE.Points object
 // inside the same scene group as the mesh, animated by the identical
 // fold/unfold bezier — no Vector3 allocation in the per-frame hot loop.
@@ -11,12 +11,12 @@ import {
 import { lonLatToFaceUV } from './lonLatToFaceUV';
 import { getRasterDimensions, getValueAtIndex, getLonLatForIndex } from './raster-engine';
 
-export interface PopulationSample {
+export interface OverlaySample {
   lon: number;
   lat: number;
 }
 
-export interface PopulationBuffers {
+export interface OverlayBuffers {
   count: number;
   smoothSphere: Float32Array; // smooth-sphere anchor: barycentric blend normalized × 1.003
   sphere: Float32Array;       // faceted anchor: barycentric blend × 1.003
@@ -27,10 +27,10 @@ export interface PopulationBuffers {
 }
 
 /** Pull every raster cell with value > 0 into plain lon/lat samples. */
-export function sampleRasterPresence(maxSamples = Infinity): PopulationSample[] {
+export function collectRasterSamples(maxSamples = Infinity): OverlaySample[] {
   const { width, height } = getRasterDimensions();
   const total = width * height;
-  const samples: PopulationSample[] = [];
+  const samples: OverlaySample[] = [];
   for (let i = 0; i < total && samples.length < maxSamples; i++) {
     if (getValueAtIndex(i) <= 0) continue;
     const [lon, lat] = getLonLatForIndex(i);
@@ -40,7 +40,7 @@ export function sampleRasterPresence(maxSamples = Infinity): PopulationSample[] 
 }
 
 /** One-time: resolve every sample to a face + barycentric weights, bake all four anchors. */
-export function buildPopulationBuffers(samples: PopulationSample[]): PopulationBuffers {
+export function buildOverlayBuffers(samples: OverlaySample[]): OverlayBuffers {
   const count = samples.length;
   const smoothSphere = new Float32Array(count * 3);
   const sphere = new Float32Array(count * 3);
@@ -114,8 +114,8 @@ export function buildPopulationBuffers(samples: PopulationSample[]): PopulationB
  *   segment 1: smooth sphere lerp -> faceted anchor
  *   segment 2: faceted anchor bezier -> dymaxion flat
  */
-export function updatePopulationPositions(
-  buffers: PopulationBuffers,
+export function updateOverlayPositions(
+  buffers: OverlayBuffers,
   globalStageT: number,
   staggerRatio: number,
   numFaces: number = NUM_FACES
@@ -147,8 +147,8 @@ export function updatePopulationPositions(
   }
 }
 
-export function createPopulationPoints(
-  buffers: PopulationBuffers,
+export function createOverlayPoints(
+  buffers: OverlayBuffers,
   options?: { color?: string; size?: number; opacity?: number }
 ): THREE.Points {
   const geometry = new THREE.BufferGeometry();

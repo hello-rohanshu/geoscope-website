@@ -6,8 +6,8 @@ import {
 } from '@/utils/icosahedron-geometry';
 
 import {
-  PopulationBuffers, PopulationSample, buildPopulationBuffers, updatePopulationPositions, createPopulationPoints,
-} from '@/utils/population-layer';
+  OverlayBuffers, OverlaySample, buildOverlayBuffers, updateOverlayPositions, createOverlayPoints,
+} from '@/utils/overlay-layer';
 
 import {
   createFaceMaterials, applyFaceSphereAttribute,
@@ -51,11 +51,11 @@ interface IcosahedronGlobeProps {
   onStageChange?: (stage: number) => void;
   className?: string;
   style?: React.CSSProperties;
-  populationSamples?: PopulationSample[];
-  showPopulation?: boolean;
-  populationColor?: string;
-  populationSize?: number;
-  populationOpacity?: number;
+  overlaySamples?: OverlaySample[];
+  showOverlay?: boolean;
+  overlayColor?: string;
+  overlaySize?: number;
+  overlayOpacity?: number;
   baseLayer?: FaceMaterialsOptions;
 }
 
@@ -66,11 +66,11 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   onStageChange,
   className,
   style,
-  populationSamples,
-  showPopulation = true,
-  populationColor,
-  populationSize,
-  populationOpacity,
+  overlaySamples,
+  showOverlay = true,
+  overlayColor,
+  overlaySize,
+  overlayOpacity,
   baseLayer = { mode: 'debug' },
   ...canvasProps
 }) => {
@@ -90,8 +90,8 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const populationBuffersRef = useRef<PopulationBuffers | null>(null);
-  const populationPointsRef = useRef<THREE.Points | null>(null);
+  const overlayBuffersRef = useRef<OverlayBuffers | null>(null);
+  const overlayPointsRef = useRef<THREE.Points | null>(null);
 
   const updateGeometry = useCallback((globalStageT: number) => {
     const meshes = meshesRef.current;
@@ -179,14 +179,14 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       wires[fi].visible = wireOpacity > 0.001;
     });
 
-    const buffers = populationBuffersRef.current;
-    const points = populationPointsRef.current;
+    const buffers = overlayBuffersRef.current;
+    const points = overlayPointsRef.current;
     if (buffers && points) {
-      // NOTE: population-layer.ts needs its own segment-aware branch mirroring
+      // NOTE: overlay-layer.ts needs its own segment-aware branch mirroring
       // the mesh logic above (smooth-normalize / lerp / bezier3 by segment).
       // Passing globalStageT straight through is a placeholder until that's
-      // updated to match — see accompanying notes for population-layer.ts.
-      updatePopulationPositions(buffers, globalStageT, STAGGER_RATIO, NUM_FACES);
+      // updated to match — see accompanying notes for overlay-layer.ts.
+      updateOverlayPositions(buffers, globalStageT, STAGGER_RATIO, NUM_FACES);
       (points.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
     }
   }, []);
@@ -309,8 +309,8 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       canvas.removeEventListener('mousedown', onMouseDown);
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseup', onMouseUp);
-      populationPointsRef.current?.geometry.dispose();
-      (populationPointsRef.current?.material as THREE.Material | undefined)?.dispose();
+      overlayPointsRef.current?.geometry.dispose();
+      (overlayPointsRef.current?.material as THREE.Material | undefined)?.dispose();
       meshesRef.current.forEach(m => {
         m.geometry.dispose();
         (m.material as THREE.Material).dispose();
@@ -330,38 +330,38 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     });
   }, [baseLayer]);
 
-  // Build (or rebuild) the population layer whenever the sample set changes
+  // Build (or rebuild) the overlay layer whenever the sample set changes
   useEffect(() => {
     const grp = groupRef.current;
     if (!grp) return;
 
-    if (populationPointsRef.current) {
-      grp.remove(populationPointsRef.current);
-      populationPointsRef.current.geometry.dispose();
-      (populationPointsRef.current.material as THREE.Material).dispose();
-      populationPointsRef.current = null;
-      populationBuffersRef.current = null;
+    if (overlayPointsRef.current) {
+      grp.remove(overlayPointsRef.current);
+      overlayPointsRef.current.geometry.dispose();
+      (overlayPointsRef.current.material as THREE.Material).dispose();
+      overlayPointsRef.current = null;
+      overlayBuffersRef.current = null;
     }
 
-    if (populationSamples && populationSamples.length > 0) {
-      const buffers = buildPopulationBuffers(populationSamples);
-      updatePopulationPositions(buffers, animRef.current.t, STAGGER_RATIO, NUM_FACES);
-      const points = createPopulationPoints(buffers, {
-        color: populationColor,
-        size: populationSize,
-        opacity: populationOpacity,
+    if (overlaySamples && overlaySamples.length > 0) {
+      const buffers = buildOverlayBuffers(overlaySamples);
+      updateOverlayPositions(buffers, animRef.current.t, STAGGER_RATIO, NUM_FACES);
+      const points = createOverlayPoints(buffers, {
+        color: overlayColor,
+        size: overlaySize,
+        opacity: overlayOpacity,
       });
-      points.visible = showPopulation;
+      points.visible = showOverlay;
       grp.add(points);
-      populationBuffersRef.current = buffers;
-      populationPointsRef.current = points;
+      overlayBuffersRef.current = buffers;
+      overlayPointsRef.current = points;
     }
-  }, [populationSamples]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [overlaySamples]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Toggle visibility independently of fold state
   useEffect(() => {
-    if (populationPointsRef.current) populationPointsRef.current.visible = showPopulation;
-  }, [showPopulation]);
+    if (overlayPointsRef.current) overlayPointsRef.current.visible = showOverlay;
+  }, [showOverlay]);
 
   // Animation loop
   useEffect(() => {

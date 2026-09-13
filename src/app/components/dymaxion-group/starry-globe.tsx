@@ -2,16 +2,16 @@
 import { useEffect, useState, useRef } from "react";
 import IcosahedronGlobe from "./icosahedron-globe";
 import { loadRaster, isLoaded } from "@/utils/raster-engine";
-import { sampleRasterPresence, PopulationSample } from "@/utils/population-layer";
+import { collectRasterSamples, OverlaySample } from "@/utils/overlay-layer";
 
 const RASTER_URL = "/population_2024_1440x720_cog.tif";
 
 export default function StarryGlobe() {
-  const [samples, setSamples] = useState<PopulationSample[]>([]);
+  const [samples, setSamples] = useState<OverlaySample[]>([]);
 
   useEffect(() => {
     (isLoaded() ? Promise.resolve(true) : loadRaster(RASTER_URL)).then((ok) => {
-      if (ok) setSamples(sampleRasterPresence());
+      if (ok) setSamples(collectRasterSamples());
     });
   }, []);
 
@@ -59,8 +59,8 @@ export default function StarryGlobe() {
       {/* Globe */}
       <div className="relative z-10 w-full max-w-3xl aspect-square">
         <IcosahedronGlobe
-          populationSamples={samples}
-          showPopulation={true}
+          overlaySamples={samples}
+          showOverlay={true}
         />
       </div>
     </div>

@@ -24,6 +24,17 @@ interface LayerDef {
   stride?: number;
 }
 
+// ── To add a raster ───────────────────────────────────────────────────
+//   1. drop the .tif in /public/
+//   2. widen LayerId with a new string literal
+//   3. append a LayerDef below
+// Tuning:
+//   threshold  = min cell value to keep (know your raster's range;
+//                0–255 for grayscale, 0–1 for normalized, etc.)
+//   stride     = sample every Nth pixel in x and y (use 2–4 for
+//                rasters bigger than ~2000px per side)
+//   maxSamples = hard cap; keeps buildOverlayBuffers from freezing
+
 const LAYERS: LayerDef[] = [
   {
     id: "population",

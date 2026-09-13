@@ -117,8 +117,6 @@ export function getLonLatForIndex(i: number): [number, number] {
   return [lon, lat];
 }
 
-export const getPopulationAt = getValueAt;
-
 /** Internal helpers */
 
 function sampleBilinear(x: number, y: number): number {

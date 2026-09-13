@@ -26,15 +26,26 @@ export interface OverlayBuffers {
   positions: Float32Array;
 }
 
-/** Pull every raster cell with value > 0 into plain lon/lat samples. */
-export function collectRasterSamples(maxSamples = Infinity): OverlaySample[] {
-  const { width, height } = getRasterDimensions();
-  const total = width * height;
+export interface CollectOptions {
+  rasterId: string;
+  threshold?: number;
+  maxSamples?: number;
+  stride?: number;
+}
+
+/** Pull every raster cell with value > threshold into plain lon/lat samples. */
+export function collectRasterSamples(opts: CollectOptions): OverlaySample[] {
+  const { rasterId, threshold = 0, maxSamples = Infinity, stride = 1 } = opts;
+  const { width, height } = getRasterDimensions(rasterId);
   const samples: OverlaySample[] = [];
-  for (let i = 0; i < total && samples.length < maxSamples; i++) {
-    if (getValueAtIndex(i) <= 0) continue;
-    const [lon, lat] = getLonLatForIndex(i);
-    samples.push({ lon, lat });
+  for (let y = 0; y < height; y += stride) {
+    for (let x = 0; x < width; x += stride) {
+      const i = y * width + x;
+      if (getValueAtIndex(rasterId, i) <= threshold) continue;
+      const [lon, lat] = getLonLatForIndex(rasterId, i);
+      samples.push({ lon, lat });
+      if (samples.length >= maxSamples) return samples;
+    }
   }
   return samples;
 }

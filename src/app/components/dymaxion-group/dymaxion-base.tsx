@@ -1,19 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import IcosahedronGlobe from "./icosahedron-globe";
 import { GLOBE_STAGES, SEGMENT_COUNT } from "@/utils/icosahedron-geometry";
-import { loadRaster, isLoaded } from "@/utils/raster-engine";
+import { loadRaster } from "@/utils/raster-engine";
 import { collectRasterSamples, OverlaySample } from "@/utils/overlay-layer";
 
-const RASTER_URL = "/population_2024_1440x720_cog.tif";
+// ── Layer registry ────────────────────────────────────────────────────
+// Add new rasters here. Each is loaded and cached in raster-engine under
+// its `id`, so switching between them is instant after first load.
+type LayerId = "population" | "blackmarble";
+
+interface LayerDef {
+  id: LayerId;
+  label: string;
+  url: string;
+  color: string;
+  size: number;
+  opacity: number;
+  threshold: number;
+  maxSamples?: number;
+  stride?: number;
+}
+
+const LAYERS: LayerDef[] = [
+  {
+    id: "population",
+    label: "Population",
+    url: "/population_2024_1440x720_cog.tif",
+    color: "#ff3b3b",
+    size: 0.012,
+    opacity: 0.35,
+    threshold: 0,
+  },
+  {
+    id: "blackmarble",
+    label: "Black Marble (2016)",
+    url: "/BlackMarble_2016_3km_gray_geo.tif",
+    color: "#ffd97a",
+    size: 0.006,
+    opacity: 0.5,
+    threshold: 40,          // 0–255 gray; raise if too many dots
+    maxSamples: 200_000,    // hard cap so buildOverlayBuffers doesn't freeze
+    stride: 2,              // 3km raster is big; every other pixel is plenty
+  },
+];
 
 export default function DymaxionBase() {
-  const [showOverlay, setShowOverlay] = useState(false); // ← off by default
+  const [activeLayerId, setActiveLayerId] = useState<LayerId | null>(null);
   const [samples, setSamples] = useState<OverlaySample[]>([]);
+  const [loading, setLoading] = useState(false);
   const [earthTexture, setEarthTexture] = useState<THREE.Texture | null>(null);
   const [stage, setStage] = useState<number>(GLOBE_STAGES.SPHERE);
+
+  // Cache collected samples per layer so flipping back is instant. The
+  // decoded raster is already cached in raster-engine; this just saves
+  // re-iterating 100k+ cells each time you switch.
+  const samplesCacheRef = useRef<Map<LayerId, OverlaySample[]>>(new Map());
 
   // Load Earth texture
   useEffect(() => {
@@ -27,12 +71,50 @@ export default function DymaxionBase() {
     setEarthTexture(tex);
   }, []);
 
-  // Load population raster data
+  // Load / switch the active raster layer.
   useEffect(() => {
-    (isLoaded() ? Promise.resolve(true) : loadRaster(RASTER_URL)).then((ok) => {
-      if (ok) setSamples(collectRasterSamples());
-    });
-  }, []);
+    if (!activeLayerId) {
+      setSamples([]);
+      return;
+    }
+
+    const cached = samplesCacheRef.current.get(activeLayerId);
+    if (cached) {
+      setSamples(cached);
+      return;
+    }
+
+    const layer = LAYERS.find((l) => l.id === activeLayerId)!;
+    let cancelled = false;
+    setLoading(true);
+
+    (async () => {
+      const ok = await loadRaster(layer.id, layer.url);
+      if (!ok || cancelled) {
+        setLoading(false);
+        return;
+      }
+      const collected = collectRasterSamples({
+        rasterId: layer.id,
+        threshold: layer.threshold,
+        maxSamples: layer.maxSamples,
+        stride: layer.stride,
+      });
+      samplesCacheRef.current.set(layer.id, collected);
+      if (!cancelled) {
+        setSamples(collected);
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLayerId]);
+
+  const activeLayer = activeLayerId
+    ? LAYERS.find((l) => l.id === activeLayerId)
+    : null;
 
   const atFlat = stage === GLOBE_STAGES.DYMAXION;
 
@@ -67,16 +149,22 @@ export default function DymaxionBase() {
               stage={stage}
               onStageChange={setStage}
               overlaySamples={samples}
-              showOverlay={showOverlay}
-              baseLayer={{ mode: 'texture', texture: earthTexture }}
+              showOverlay={activeLayerId !== null}
+              overlayColor={activeLayer?.color}
+              overlaySize={activeLayer?.size}
+              overlayOpacity={activeLayer?.opacity}
+              baseLayer={{ mode: "texture", texture: earthTexture }}
             />
           ) : (
             <IcosahedronGlobe
               stage={stage}
               onStageChange={setStage}
               overlaySamples={samples}
-              showOverlay={showOverlay}
-              baseLayer={{ mode: 'debug' }}
+              showOverlay={activeLayerId !== null}
+              overlayColor={activeLayer?.color}
+              overlaySize={activeLayer?.size}
+              overlayOpacity={activeLayer?.opacity}
+              baseLayer={{ mode: "debug" }}
             />
           )}
         </div>
@@ -92,20 +180,41 @@ export default function DymaxionBase() {
       {/* Right Column: Controls + Cards — only at dymaxion stage */}
       {atFlat && (
         <div className="flex flex-col gap-6 flex-[1] min-w-0 lg:min-w-[280px]">
-          <div className="bg-gray-800 rounded-lg border border-gray-600 p-4 space-y-4 flex-1">
+          <div className="bg-gray-800 rounded-lg border border-gray-600 p-4 space-y-3 flex-1">
             <div className="text-gray-300 font-semibold tracking-wide">
               Overlays
             </div>
 
             <label className="flex items-center gap-3 text-gray-300 cursor-pointer select-none">
               <input
-                type="checkbox"
-                checked={showOverlay}
-                onChange={() => setShowOverlay(v => !v)}
+                type="radio"
+                name="layer"
+                checked={activeLayerId === null}
+                onChange={() => setActiveLayerId(null)}
                 className="accent-red-500"
               />
-              <span>Population</span>
+              <span>Off</span>
             </label>
+
+            {LAYERS.map((l) => (
+              <label
+                key={l.id}
+                className="flex items-center gap-3 text-gray-300 cursor-pointer select-none"
+              >
+                <input
+                  type="radio"
+                  name="layer"
+                  checked={activeLayerId === l.id}
+                  onChange={() => setActiveLayerId(l.id)}
+                  className="accent-red-500"
+                />
+                <span>{l.label}</span>
+              </label>
+            ))}
+
+            {loading && (
+              <div className="text-gray-500 text-xs pt-1">Loading…</div>
+            )}
           </div>
         </div>
       )}

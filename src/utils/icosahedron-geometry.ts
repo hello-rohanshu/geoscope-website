@@ -355,16 +355,22 @@ export const FACE_SPHERE_POSITIONS: Float32Array[] = SPHERE3D.map((face) => {
 // wireframe is drawn. Motion happens BETWEEN stages; the pair of rows
 // you are standing between fully determines what animates.
 //
-//   STAGE                MESH    WIRES   segment
+//   STAGE                MESH    WIRES   transition
 //   SPHERE               sphere  none    ─┐  0→1 : wires draw in
 //   SPHERE_TRIANGULATED  sphere  full     │  1→2 : sphere facets outward
 //   ICOSAHEDRON          facet   full     │  2→3 : facets unfold flat
 //   DYMAXION             flat    full     │  3→4 : wires retract
 //   WIRES_GONE           flat    none    ─┘
 //
-// Adjacent rows with the SAME mesh pose mean that segment is a pure
+// Adjacent rows with the SAME mesh pose mean that transition is a pure
 // wire beat (no shape change). Same wire pose means a pure shape beat.
 // Reading the columns top-to-bottom IS the fold.
+//
+// `t` is a TIME value, not a stage index. Each stage carries a
+// `duration` for its outgoing transition; stages start at cumulative
+// times (STAGE_START) and the whole fold spans SEGMENT_COUNT units.
+// With every duration = 1.0, this is identical to the old
+// "one unit per transition" behavior.
 //
 // Subdivision (SUB_BARY / FACE_SPHERE_POSITIONS) only affects the
 // 'sphere' mesh pose. 'facet' and 'flat' use only the 3 original
@@ -378,42 +384,89 @@ export interface StageDef {
   name: string;
   mesh: MeshPose;
   wires: WirePose;
+  /**
+   * Time (in t-units) for the transition OUT of this stage — i.e. from
+   * this stage to the next. The final stage has no outgoing transition,
+   * so its duration is never read.
+   *
+   * All durations = 1.0 reproduces the previous constant-speed behavior
+   * exactly. Tune individual beats here: draw-in slow, unfold fast, etc.
+   */
+  duration: number;
 }
 
 export const STAGES: readonly StageDef[] = [
-  { name: 'SPHERE',              mesh: 'sphere', wires: 'none' },
-  { name: 'SPHERE_TRIANGULATED', mesh: 'sphere', wires: 'full' },
-  { name: 'ICOSAHEDRON',         mesh: 'facet',  wires: 'full' },
-  { name: 'DYMAXION',            mesh: 'flat',   wires: 'full' },
-  { name: 'WIRES_GONE',          mesh: 'flat',   wires: 'none' },
+  { name: 'SPHERE',              mesh: 'sphere', wires: 'none', duration: 1.618 },
+  { name: 'SPHERE_TRIANGULATED', mesh: 'sphere', wires: 'full', duration: 1.0 },
+  { name: 'ICOSAHEDRON',         mesh: 'facet',  wires: 'full', duration: 1.0 },
+  { name: 'DYMAXION',            mesh: 'flat',   wires: 'full', duration: 1.618 },
+  { name: 'WIRES_GONE',          mesh: 'flat',   wires: 'none', duration: 0   },
 ] as const;
 
-// Named index into STAGES. Kept as a lookup so consumers can write
-// GLOBE_STAGES.DYMAXION instead of a bare 3.
+// Cumulative start time of each stage along the t timeline.
+// STAGE_START[i] is where stage i begins; the transition OUT of stage i
+// runs from STAGE_START[i] to STAGE_START[i + 1] and takes
+// STAGES[i].duration. Derived from the table so it can never drift.
+const STAGE_START: readonly number[] = (() => {
+  const out: number[] = [0];
+  for (let i = 0; i < STAGES.length - 1; i++) {
+    out.push(out[i] + STAGES[i].duration);
+  }
+  return out;
+})();
+
+// Named index into STAGES. Values are CUMULATIVE TIMES, not sequential
+// integers — GLOBE_STAGES.SPHERE is 0, GLOBE_STAGES.WIRES_GONE is the
+// total duration of the fold. Consumers should always use the named
+// keys, never the raw numbers.
 export const GLOBE_STAGES = {
-  SPHERE: 0,
-  SPHERE_TRIANGULATED: 1,
-  ICOSAHEDRON: 2,
-  DYMAXION: 3,
-  WIRES_GONE: 4,
+  SPHERE:              STAGE_START[0],
+  SPHERE_TRIANGULATED: STAGE_START[1],
+  ICOSAHEDRON:         STAGE_START[2],
+  DYMAXION:            STAGE_START[3],
+  WIRES_GONE:          STAGE_START[4],
 } as const;
 
 export const STAGE_COUNT = STAGES.length;
-export const SEGMENT_COUNT = STAGE_COUNT - 1;
+
+// Total t-span of the whole fold. Kept named SEGMENT_COUNT for backward
+// compatibility, but its value is now a DURATION, not a count. Every
+// consumer treats it as "the end of the timeline," which is still
+// correct — it just stops being an integer in the general case.
+export const SEGMENT_COUNT: number = STAGE_START[STAGE_START.length - 1];
 
 /**
  * Split a continuous stage value into (a) which animation segment is
  * active, and (b) the local 0..1 progress within that segment.
  *
- * Example: globalStageT = 1.4 → { segment: 1, localT: 0.4 } meaning
- * "40% of the way through the sphere→icosahedron inflation".
- *
  * `segment` indexes the row you are LEAVING; the transition is between
  * STAGES[segment] and STAGES[segment + 1]. `localT` is how far along
- * that transition you are.
+ * that transition you are, in [0, 1].
+ *
+ * With per-stage durations, `t` is a time value: segment boundaries sit
+ * at cumulative times in STAGE_START, and localT is the fraction of the
+ * way from STAGE_START[segment] to STAGE_START[segment + 1].
+ *
+ * Example: durations [1.0, 1.0, 1.0, 1.0], globalStageT = 1.4
+ *   → { segment: 1, localT: 0.4 }
+ * meaning "40% of the way through the sphere→icosahedron inflation".
  */
 export function resolveSegment(globalStageT: number): { segment: number; localT: number } {
   const clamped = Math.max(0, Math.min(SEGMENT_COUNT, globalStageT));
-  const segment = Math.min(SEGMENT_COUNT - 1, Math.floor(clamped));
-  return { segment, localT: clamped - segment };
+
+  // Find the segment containing t: the largest i such that
+  // STAGE_START[i] <= t. Linear scan — four segments, not worth a
+  // binary search.
+  let segment = 0;
+  for (let i = STAGES.length - 2; i >= 0; i--) {
+    if (clamped >= STAGE_START[i]) { segment = i; break; }
+  }
+
+  const start = STAGE_START[segment];
+  const duration = STAGES[segment].duration;
+  // Guard against a zero-duration stage: treat its localT as 0 so the
+  // transition is instantaneous rather than NaN.
+  const localT = duration > 0 ? (clamped - start) / duration : 0;
+
+  return { segment, localT: Math.max(0, Math.min(1, localT)) };
 }

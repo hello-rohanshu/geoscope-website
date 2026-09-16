@@ -7,8 +7,7 @@ import HumanityTimeline from '@/app/components/timeline/humanity-timeline';
 import GeoscopeTitleCard from '@/app/components/title-card';
 import DomainPanels from '@/app/components/domain-panels';
 import DesignScienceProgress from '@/app/components/design-science-progress';
-import DymaxionBase from "@/app/components/dymaxion-group/dymaxion-base"
-
+import DymaxionBase from "@/app/components/dymaxion-group/dymaxion-base";
 
 // Reusable full-screen layout wrapper providing site-wide boundary/padding
 function Section({
@@ -52,6 +51,10 @@ export default function Home() {
 
   return (
     <main className="relative text-white overflow-x-hidden">
+
+      <Section className="z-10">
+        <GeoscopeCanvas />
+      </Section>
 
       <Section className="z-10">
         <DymaxionBase />

@@ -127,7 +127,7 @@ export default function DymaxionBase() {
     ? LAYERS.find((l) => l.id === activeLayerId)
     : null;
 
-  const atFlat = stage === GLOBE_STAGES.DYMAXION;
+  const atFlat = stage >= GLOBE_STAGES.DYMAXION;
 
   return (
     <div className="relative w-full p-4 sm:p-8 lg:p-12 flex flex-col lg:flex-row lg:items-start gap-6 lg:gap-8 bg-transparent">

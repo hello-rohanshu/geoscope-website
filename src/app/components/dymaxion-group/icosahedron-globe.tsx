@@ -16,23 +16,17 @@ import {
 
 // ──────────────────────────── CONFIGURATION ────────────────────────────
 
-/** Interpolation speed per frame toward the target stage (0..3). */
+/** Interpolation speed per frame toward the target stage (0..SEGMENT_COUNT). */
 const ANIMATION_SPEED: number = 0.03;
 
 /** Fold animation delay across faces: 0 = lockstep movement, >0 = wave/cascade across faces. */
 const STAGGER_RATIO: number = 0.0;
 
-/** Wireframe draw-in stagger ratio across faces during stage 0 -> 1. */
+/** Wireframe draw-in/out stagger ratio across faces. Used for both directions. */
 const WIRE_STAGGER_RATIO: number = 0.5;
 
 /** Maximum target opacity of wireframe lines once drawn. */
 const WIRE_MAX_OPACITY: number = 0.35;
-
-/**
- * Speed at which wireframe lines fade out after settling at stage 3 (DYMAXION).
- * State-driven (advances only when t === tgt === 3); scrub-back resets this instantly.
- */
-const WIRE_POST_FADE_SPEED: number = 0.015;
 
 // ── CUSTOM SHADERS FOR HAND-DRAWN WIREFRAME ────────────────────────────
 
@@ -100,17 +94,12 @@ interface AnimState {
   lastMouse: { x: number; y: number } | null;
   /** Current requestAnimationFrame tick handle for cleanup. */
   frameId: number;
-  /**
-   * Post-fold fade progress (0 = visible, 1 = faded).
-   * Advances only while settled at stage 3 (DYMAXION). Resets to 0 when leaving.
-   */
-  wirePostFadeT: number;
 }
 
 interface IcosahedronGlobeProps {
   width?: number;
   height?: number;
-  /** Target globe stage: 0=sphere, 1=triangulated sphere, 2=icosahedron, 3=dymaxion. Fractional values supported. */
+  /** Target globe stage: 0=sphere, 1=triangulated sphere, 2=icosahedron, 3=dymaxion, 4=wires gone. Fractional values supported. */
   stage?: number;
   onStageChange?: (stage: number) => void;
   className?: string;
@@ -153,7 +142,6 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     drag: false,
     lastMouse: null,
     frameId: 0,
-    wirePostFadeT: 0,
   });
 
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -163,7 +151,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   const overlayPointsRef = useRef<THREE.Points | null>(null);
 
   /**
-   * Core frame update function. Evaluates the current global animation stage (0..3),
+   * Core frame update function. Evaluates the current global animation stage (0..4),
    * morphs mesh sub-vertices, updates wireframe endpoints, and updates shader uniforms.
    */
   const updateGeometry = useCallback((globalStageT: number) => {
@@ -171,14 +159,19 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     const wires = wiresRef.current;
     if (!meshes.length) return;
 
-    // Resolve continuous stage into active segment index (0, 1, or 2) and local [0..1] stage transition progress
+    // Resolve continuous stage into active segment index (0..3) and local [0..1] stage transition progress
     const { segment, localT } = resolveSegment(globalStageT);
     const fadeT = Math.max(0, Math.min(1, globalStageT));
-    const wirePostFade = animRef.current.wirePostFadeT;
+    // Fade-out is now stage 3 → 4, driven purely by localT within that
+    // segment. Zero everywhere else, so the wire stays fully drawn from
+    // stage 1 through stage 3 and only retracts during the final beat.
+    const fadeOutT = segment === 3 ? localT : 0;
 
     SPHERE3D.forEach((_, fi: number) => {
       const faceT = computeFaceT(localT, fi, NUM_FACES, STAGGER_RATIO);
-      const et = ease(faceT);
+      // Pin the mesh to its fully-flat pose during the final stage — the
+      // geometry is static while the wires retract, so et stays at 1.
+      const et = segment < 3 ? ease(faceT) : 1;
 
       // Extract raw 3D spherical, flat 2D net, and bezier control points for the 3 face corners
       const corners = ([0, 1, 2] as const).map((i) => {
@@ -210,6 +203,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
           v = smoothPos.lerp(facetPos, et);
         } else {
           // Stage 2 -> 3: Quadratic Bezier transformation from 3D icosahedron to flat 2D Dymaxion net
+          // Stage 3 -> 4: et is pinned to 1, so this evaluates to flatPos — geometry holds still.
           const flatPos = new THREE.Vector3(
             w0 * corners[0].flat.x + w1 * corners[1].flat.x + w2 * corners[2].flat.x,
             w0 * corners[0].flat.y + w1 * corners[1].flat.y + w2 * corners[2].flat.y,
@@ -251,10 +245,13 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       wires[fi].geometry.attributes.position.needsUpdate = true;
 
       // ── UPDATE HAND-DRAWN SHADER UNIFORMS ──────────────────────────
-      // drawProgress drives the GLSL stroke length; the post-fold fade term
-      // (1 - wirePostFade) reverses the draw back to zero once settled at stage 3.
-      const wireT = computeFaceT(fadeT, fi, NUM_FACES, WIRE_STAGGER_RATIO);
-      const drawProgress = ease(wireT) * (1 - wirePostFade);
+      // drawProgress drives the GLSL stroke length. It rises during
+      // segment 0→1 (draw-in) and falls during segment 3→4 (retract),
+      // using the same staggered per-face timing in both directions so
+      // the wire appears and disappears as one coherent lifecycle.
+      const drawIn = ease(computeFaceT(fadeT, fi, NUM_FACES, WIRE_STAGGER_RATIO));
+      const fadeOut = ease(computeFaceT(fadeOutT, fi, NUM_FACES, WIRE_STAGGER_RATIO));
+      const drawProgress = drawIn * (1 - fadeOut);
 
       const wireMat = wires[fi].material as THREE.ShaderMaterial;
       wireMat.uniforms.uProgress.value = drawProgress;
@@ -459,7 +456,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     if (overlayPointsRef.current) overlayPointsRef.current.visible = showOverlay;
   }, [showOverlay]);
 
-  // Main render loop handling interpolation, idle rotation, and post-fold wire fade
+  // Main render loop handling interpolation and idle rotation
   useEffect(() => {
     const loop = (): void => {
       const { t, tgt, drag } = animRef.current;
@@ -472,23 +469,6 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
         animRef.current.t = tgt;
       }
 
-      // State-driven wireframe post-fade once settled on stage 3 (DYMAXION).
-      // Any deviation (Prev, scrub, drag-then-release) resets to 0, which
-      // brings the wires back on the very next frame. Because this is state,
-      // not a timer, no cleanup or cancellation is needed.
-      if (
-        WIRE_POST_FADE_SPEED > 0 &&
-        animRef.current.tgt === GLOBE_STAGES.DYMAXION &&
-        animRef.current.t === GLOBE_STAGES.DYMAXION
-      ) {
-        animRef.current.wirePostFadeT = Math.min(
-          1,
-          animRef.current.wirePostFadeT + WIRE_POST_FADE_SPEED,
-        );
-      } else {
-        animRef.current.wirePostFadeT = 0;
-      }
-
       updateGeometry(animRef.current.t);
 
       // Automated camera/group orientation behavior
@@ -496,8 +476,9 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
         if (animRef.current.tgt === GLOBE_STAGES.SPHERE && animRef.current.t < 0.05) {
           // Slow continuous rotation on default sphere view
           groupRef.current.rotation.y += 0.004;
-        } else if (animRef.current.tgt === GLOBE_STAGES.DYMAXION) {
-          // Damped realignment to face flat net towards camera when fully unfolded
+        } else if (animRef.current.tgt >= GLOBE_STAGES.DYMAXION) {
+          // Damped realignment to face flat net towards camera when fully unfolded.
+          // Holds through stage 4 as well, so the flat net stays square-on while wires retract.
           const progress = animRef.current.t / SEGMENT_COUNT;
           const damping = 0.02 + progress * 0.06;
           groupRef.current.rotation.x += (-0.04 - groupRef.current.rotation.x) * damping;

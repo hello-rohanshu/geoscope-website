@@ -347,28 +347,36 @@ export const FACE_SPHERE_POSITIONS: Float32Array[] = SPHERE3D.map((face) => {
 });
 
 // ── Multi-stage animation model ───────────────────────────────────────
-// The globe animates continuously through four discrete "stages"; the
+// The globe animates continuously through five discrete "stages"; the
 // `stage` prop on IcosahedronGlobe is a float in [0, SEGMENT_COUNT] and
 // fractional values scrub within a segment.
 //
 //   0  SPHERE               smooth subdivided sphere (no wireframe)
-//   1  SPHERE_TRIANGULATED  same sphere, wireframe fades in
+//   1  SPHERE_TRIANGULATED  same sphere, wireframe fully drawn
 //   2  ICOSAHEDRON          sphere inflates outward into flat facets
 //   3  DYMAXION             facets unfold into the flat net
+//   4  WIRES_GONE           wireframe retracts back out
+//
+// The wireframe lifecycle is symmetric across two segments:
+//   0 → 1  draws in
+//   1 → 3  holds fully drawn (during the shape morphs)
+//   3 → 4  draws back out
 //
 // Subdivision (SUB_BARY / FACE_SPHERE_POSITIONS) only affects stages 0
-// and 1 — the mesh there is drawn from SUB_BARY sub-vertices. Stages 2
-// and 3 use only the 3 original SPHERE3D corners per face (sub-vertices
-// collapse onto the corners as the fold progresses). The wireframe is
-// ALWAYS drawn from the 3 original corners regardless of stage.
+// and 1 — the mesh there is drawn from SUB_BARY sub-vertices. Stages 2,
+// 3, and 4 use only the 3 original SPHERE3D corners per face (sub-vertices
+// collapse onto the corners as the fold progresses). Stage 4 holds the
+// flat geometry static while the wires retract. The wireframe is ALWAYS
+// drawn from the 3 original corners regardless of stage.
 export const GLOBE_STAGES = {
   SPHERE: 0,
   SPHERE_TRIANGULATED: 1,
   ICOSAHEDRON: 2,
   DYMAXION: 3,
+  WIRES_GONE: 4,
 } as const;
 
-export const STAGE_COUNT = 4;
+export const STAGE_COUNT = 5;
 export const SEGMENT_COUNT = STAGE_COUNT - 1;
 
 /**

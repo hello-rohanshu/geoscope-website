@@ -16,8 +16,10 @@ import {
 
 // ──────────────────────────── CONFIGURATION ────────────────────────────
 
-/** Interpolation speed per frame toward the target stage (0..SEGMENT_COUNT). */
-const ANIMATION_SPEED: number = 0.015;
+/** How far the playhead advances per frame, in t-units. Pairs with the
+ *  per-stage `duration` in STAGES: this is "how fast pages turn," that
+ *  is "how many pages each chapter has." */
+const PLAYHEAD_RATE: number = 0.03;
 
 /** Fold animation delay across faces: 0 = lockstep movement, >0 = wave/cascade across faces. */
 const STAGGER_RATIO: number = 0.0;
@@ -180,7 +182,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     // staggered per face. The retract at 3→4 uses the same code path as
     // the draw-in at 0→1 — they differ only in which row is 'full'.
     const wireFrom = rowA.wires === 'full' ? 1 : 0;
-    const wireTo   = rowB.wires === 'full' ? 1 : 0;
+    const wireTo = rowB.wires === 'full' ? 1 : 0;
 
     SPHERE3D.forEach((_, fi: number) => {
       const faceT = computeFaceT(localT, fi, NUM_FACES, STAGGER_RATIO);
@@ -247,7 +249,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
           }
         }
 
-        posArray[i * 3]     = v.x;
+        posArray[i * 3] = v.x;
         posArray[i * 3 + 1] = v.y;
         posArray[i * 3 + 2] = v.z;
       });
@@ -494,7 +496,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
 
       // Smooth step towards target stage position
       if (Math.abs(t - tgt) > 0.0005) {
-        const newT = t + (tgt > t ? ANIMATION_SPEED : -ANIMATION_SPEED);
+        const newT = t + (tgt > t ? PLAYHEAD_RATE : -PLAYHEAD_RATE);
         animRef.current.t = Math.max(0, Math.min(SEGMENT_COUNT, newT));
       } else if (t !== tgt) {
         animRef.current.t = tgt;

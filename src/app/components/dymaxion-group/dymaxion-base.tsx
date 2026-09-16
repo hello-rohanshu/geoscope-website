@@ -131,23 +131,16 @@ export default function DymaxionBase() {
 
   return (
     <div className="relative w-full p-4 sm:p-8 lg:p-12 flex flex-col lg:flex-row lg:items-start gap-6 lg:gap-8 bg-transparent">
-      {/* Stage Prev/Next — always visible */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
+      {/* Stage Play/Reset toggle */}
+      <div className="absolute top-4 right-4 z-10">
         <button
           type="button"
-          onClick={() => setStage((s) => Math.max(0, s - 1))}
-          disabled={stage <= 0}
-          className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold tracking-wide transition-colors shadow-lg"
+          onClick={() =>
+            setStage(stage >= GLOBE_STAGES.WIRES_GONE ? GLOBE_STAGES.SPHERE : GLOBE_STAGES.WIRES_GONE)
+          }
+          className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-semibold tracking-wide transition-colors shadow-lg"
         >
-          Prev
-        </button>
-        <button
-          type="button"
-          onClick={() => setStage((s) => Math.min(SEGMENT_COUNT, s + 1))}
-          disabled={stage >= SEGMENT_COUNT}
-          className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold tracking-wide transition-colors shadow-lg"
-        >
-          Next
+          {stage >= GLOBE_STAGES.WIRES_GONE ? 'Reset' : 'Play'}
         </button>
       </div>
 

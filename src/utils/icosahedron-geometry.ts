@@ -351,23 +351,45 @@ export const FACE_SPHERE_POSITIONS: Float32Array[] = SPHERE3D.map((face) => {
 // `stage` prop on IcosahedronGlobe is a float in [0, SEGMENT_COUNT] and
 // fractional values scrub within a segment.
 //
-//   0  SPHERE               smooth subdivided sphere (no wireframe)
-//   1  SPHERE_TRIANGULATED  same sphere, wireframe fully drawn
-//   2  ICOSAHEDRON          sphere inflates outward into flat facets
-//   3  DYMAXION             facets unfold into the flat net
-//   4  WIRES_GONE           wireframe retracts back out
+// A stage is a NAMED POSE — what shape the mesh holds, and whether the
+// wireframe is drawn. Motion happens BETWEEN stages; the pair of rows
+// you are standing between fully determines what animates.
 //
-// The wireframe lifecycle is symmetric across two segments:
-//   0 → 1  draws in
-//   1 → 3  holds fully drawn (during the shape morphs)
-//   3 → 4  draws back out
+//   STAGE                MESH    WIRES   segment
+//   SPHERE               sphere  none    ─┐  0→1 : wires draw in
+//   SPHERE_TRIANGULATED  sphere  full     │  1→2 : sphere facets outward
+//   ICOSAHEDRON          facet   full     │  2→3 : facets unfold flat
+//   DYMAXION             flat    full     │  3→4 : wires retract
+//   WIRES_GONE           flat    none    ─┘
 //
-// Subdivision (SUB_BARY / FACE_SPHERE_POSITIONS) only affects stages 0
-// and 1 — the mesh there is drawn from SUB_BARY sub-vertices. Stages 2,
-// 3, and 4 use only the 3 original SPHERE3D corners per face (sub-vertices
-// collapse onto the corners as the fold progresses). Stage 4 holds the
-// flat geometry static while the wires retract. The wireframe is ALWAYS
-// drawn from the 3 original corners regardless of stage.
+// Adjacent rows with the SAME mesh pose mean that segment is a pure
+// wire beat (no shape change). Same wire pose means a pure shape beat.
+// Reading the columns top-to-bottom IS the fold.
+//
+// Subdivision (SUB_BARY / FACE_SPHERE_POSITIONS) only affects the
+// 'sphere' mesh pose. 'facet' and 'flat' use only the 3 original
+// SPHERE3D corners per face (sub-vertices collapse onto the corners as
+// the fold progresses). The wireframe is ALWAYS drawn from the 3
+// original corners regardless of stage.
+export type MeshPose = 'sphere' | 'facet' | 'flat';
+export type WirePose = 'none' | 'full';
+
+export interface StageDef {
+  name: string;
+  mesh: MeshPose;
+  wires: WirePose;
+}
+
+export const STAGES: readonly StageDef[] = [
+  { name: 'SPHERE',              mesh: 'sphere', wires: 'none' },
+  { name: 'SPHERE_TRIANGULATED', mesh: 'sphere', wires: 'full' },
+  { name: 'ICOSAHEDRON',         mesh: 'facet',  wires: 'full' },
+  { name: 'DYMAXION',            mesh: 'flat',   wires: 'full' },
+  { name: 'WIRES_GONE',          mesh: 'flat',   wires: 'none' },
+] as const;
+
+// Named index into STAGES. Kept as a lookup so consumers can write
+// GLOBE_STAGES.DYMAXION instead of a bare 3.
 export const GLOBE_STAGES = {
   SPHERE: 0,
   SPHERE_TRIANGULATED: 1,
@@ -376,15 +398,19 @@ export const GLOBE_STAGES = {
   WIRES_GONE: 4,
 } as const;
 
-export const STAGE_COUNT = 5;
+export const STAGE_COUNT = STAGES.length;
 export const SEGMENT_COUNT = STAGE_COUNT - 1;
 
 /**
- * Split a continuous stage value into (a) which of the three animation
- * segments is active, and (b) the local 0..1 progress within that segment.
+ * Split a continuous stage value into (a) which animation segment is
+ * active, and (b) the local 0..1 progress within that segment.
  *
  * Example: globalStageT = 1.4 → { segment: 1, localT: 0.4 } meaning
  * "40% of the way through the sphere→icosahedron inflation".
+ *
+ * `segment` indexes the row you are LEAVING; the transition is between
+ * STAGES[segment] and STAGES[segment + 1]. `localT` is how far along
+ * that transition you are.
  */
 export function resolveSegment(globalStageT: number): { segment: number; localT: number } {
   const clamped = Math.max(0, Math.min(SEGMENT_COUNT, globalStageT));

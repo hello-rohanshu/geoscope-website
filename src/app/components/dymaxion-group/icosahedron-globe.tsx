@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import {
   SPHERE3D, SPHERE, FLAT, ease, bezier3, vertexKey, vertexControlMap, computeFaceT, NUM_FACES, SUB_BARY,
-  GLOBE_STAGES, SEGMENT_COUNT, resolveSegment,
+  GLOBE_STAGES, SEGMENT_COUNT, resolveSegment, STAGES,
 } from '@/utils/icosahedron-geometry';
 
 import {
@@ -17,7 +17,7 @@ import {
 // ──────────────────────────── CONFIGURATION ────────────────────────────
 
 /** Interpolation speed per frame toward the target stage (0..SEGMENT_COUNT). */
-const ANIMATION_SPEED: number = 0.03;
+const ANIMATION_SPEED: number = 0.015;
 
 /** Fold animation delay across faces: 0 = lockstep movement, >0 = wave/cascade across faces. */
 const STAGGER_RATIO: number = 0.0;
@@ -151,27 +151,43 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   const overlayPointsRef = useRef<THREE.Points | null>(null);
 
   /**
-   * Core frame update function. Evaluates the current global animation stage (0..4),
-   * morphs mesh sub-vertices, updates wireframe endpoints, and updates shader uniforms.
+   * Core frame update function. Reads the STAGES table to know what the
+   * current segment should look like, then blends the two rows it sits
+   * between by `localT`. Every animated quantity — mesh pose, wire
+   * endpoints, wire drawProgress — is a function of the row pair.
    */
   const updateGeometry = useCallback((globalStageT: number) => {
     const meshes = meshesRef.current;
     const wires = wiresRef.current;
     if (!meshes.length) return;
 
-    // Resolve continuous stage into active segment index (0..3) and local [0..1] stage transition progress
+    // Row pair for this frame. `segment` is the row we are LEAVING; the
+    // transition is between STAGES[segment] and STAGES[segment + 1].
     const { segment, localT } = resolveSegment(globalStageT);
-    const fadeT = Math.max(0, Math.min(1, globalStageT));
-    // Fade-out is now stage 3 → 4, driven purely by localT within that
-    // segment. Zero everywhere else, so the wire stays fully drawn from
-    // stage 1 through stage 3 and only retracts during the final beat.
-    const fadeOutT = segment === 3 ? localT : 0;
+    const rowA = STAGES[segment];
+    const rowB = STAGES[segment + 1];
+
+    // The pair of mesh poses fully determines the algorithm:
+    //   sphere → sphere : hold smooth sphere (static)
+    //   sphere → facet  : lerp smooth → faceted
+    //   facet  → flat   : bezier through the flare control point
+    //   flat   → flat   : hold flat net (static)
+    // Adjacent equal poses mean this segment is a pure wire beat.
+    const meshMotion = `${rowA.mesh}->${rowB.mesh}`;
+    const holdPose = rowA.mesh === rowB.mesh;
+
+    // Wire motion is a single lerp between the two rows' wire poses,
+    // staggered per face. The retract at 3→4 uses the same code path as
+    // the draw-in at 0→1 — they differ only in which row is 'full'.
+    const wireFrom = rowA.wires === 'full' ? 1 : 0;
+    const wireTo   = rowB.wires === 'full' ? 1 : 0;
 
     SPHERE3D.forEach((_, fi: number) => {
       const faceT = computeFaceT(localT, fi, NUM_FACES, STAGGER_RATIO);
-      // Pin the mesh to its fully-flat pose during the final stage — the
-      // geometry is static while the wires retract, so et stays at 1.
-      const et = segment < 3 ? ease(faceT) : 1;
+      // Holding a pose pins et to 1. This is what keeps the wire at its
+      // flat corners during the retract segment (flat→flat) instead of
+      // resetting to the sphere corner on the first frame of that segment.
+      const et = holdPose ? 1 : ease(faceT);
 
       // Extract raw 3D spherical, flat 2D net, and bezier control points for the 3 face corners
       const corners = ([0, 1, 2] as const).map((i) => {
@@ -194,30 +210,44 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
         );
 
         let v: THREE.Vector3;
-        if (segment === 0) {
-          // Stage 0 -> 1: Standard smooth unit sphere surface
-          v = facetPos.clone().normalize();
-        } else if (segment === 1) {
-          // Stage 1 -> 2: Smooth sphere morphs into faceted icosahedron geometry
-          const smoothPos = facetPos.clone().normalize();
-          v = smoothPos.lerp(facetPos, et);
-        } else {
-          // Stage 2 -> 3: Quadratic Bezier transformation from 3D icosahedron to flat 2D Dymaxion net
-          // Stage 3 -> 4: et is pinned to 1, so this evaluates to flatPos — geometry holds still.
-          const flatPos = new THREE.Vector3(
-            w0 * corners[0].flat.x + w1 * corners[1].flat.x + w2 * corners[2].flat.x,
-            w0 * corners[0].flat.y + w1 * corners[1].flat.y + w2 * corners[2].flat.y,
-            w0 * corners[0].flat.z + w1 * corners[1].flat.z + w2 * corners[2].flat.z,
-          );
-          const cpPos = new THREE.Vector3(
-            w0 * corners[0].cp.x + w1 * corners[1].cp.x + w2 * corners[2].cp.x,
-            w0 * corners[0].cp.y + w1 * corners[1].cp.y + w2 * corners[2].cp.y,
-            w0 * corners[0].cp.z + w1 * corners[1].cp.z + w2 * corners[2].cp.z,
-          );
-          v = bezier3(facetPos, flatPos, cpPos, et);
+        switch (meshMotion) {
+          case 'sphere->sphere':
+            // Static smooth unit sphere.
+            v = facetPos.normalize();
+            break;
+
+          case 'sphere->facet':
+            // Smooth sphere morphs into faceted icosahedron geometry.
+            v = facetPos.clone().normalize().lerp(facetPos, et);
+            break;
+
+          case 'flat->flat':
+            // Static flat net — mesh holds its dymaxion pose.
+            v = new THREE.Vector3(
+              w0 * corners[0].flat.x + w1 * corners[1].flat.x + w2 * corners[2].flat.x,
+              w0 * corners[0].flat.y + w1 * corners[1].flat.y + w2 * corners[2].flat.y,
+              w0 * corners[0].flat.z + w1 * corners[1].flat.z + w2 * corners[2].flat.z,
+            );
+            break;
+
+          default: { // 'facet->flat'
+            // Quadratic Bezier transformation from 3D icosahedron to flat 2D Dymaxion net.
+            const flatPos = new THREE.Vector3(
+              w0 * corners[0].flat.x + w1 * corners[1].flat.x + w2 * corners[2].flat.x,
+              w0 * corners[0].flat.y + w1 * corners[1].flat.y + w2 * corners[2].flat.y,
+              w0 * corners[0].flat.z + w1 * corners[1].flat.z + w2 * corners[2].flat.z,
+            );
+            const cpPos = new THREE.Vector3(
+              w0 * corners[0].cp.x + w1 * corners[1].cp.x + w2 * corners[2].cp.x,
+              w0 * corners[0].cp.y + w1 * corners[1].cp.y + w2 * corners[2].cp.y,
+              w0 * corners[0].cp.z + w1 * corners[1].cp.z + w2 * corners[2].cp.z,
+            );
+            v = bezier3(facetPos, flatPos, cpPos, et);
+            break;
+          }
         }
 
-        posArray[i * 3] = v.x;
+        posArray[i * 3]     = v.x;
         posArray[i * 3 + 1] = v.y;
         posArray[i * 3 + 2] = v.z;
       });
@@ -225,12 +255,15 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       meshes[fi].geometry.attributes.position.needsUpdate = true;
 
       // ── UPDATE WIREFRAME LINE ENDPOINTS ────────────────────────────
-      // Unrolled into 6 explicit vertices (3 line segments [0-1, 1-2, 2-0]) to support continuous GLSL stroke drawing
+      // Wire corners sit on the smooth sphere while the mesh is still a
+      // sphere (rowA.mesh === 'sphere'). Once the mesh has started its
+      // facet/flat deformation, the wire follows the same bezier path.
+      const wireFollowsMesh = rowA.mesh !== 'sphere';
       const wPosArray = wires[fi].geometry.attributes.position.array as Float32Array;
       const currentPts = ([0, 1, 2] as const).map((i) =>
-        segment < 2
-          ? corners[i].sphere
-          : bezier3(corners[i].sphere, corners[i].flat, corners[i].cp, et)
+        wireFollowsMesh
+          ? bezier3(corners[i].sphere, corners[i].flat, corners[i].cp, et)
+          : corners[i].sphere
       );
 
       const pairs = [[0, 1], [1, 2], [2, 0]];
@@ -245,13 +278,11 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       wires[fi].geometry.attributes.position.needsUpdate = true;
 
       // ── UPDATE HAND-DRAWN SHADER UNIFORMS ──────────────────────────
-      // drawProgress drives the GLSL stroke length. It rises during
-      // segment 0→1 (draw-in) and falls during segment 3→4 (retract),
-      // using the same staggered per-face timing in both directions so
-      // the wire appears and disappears as one coherent lifecycle.
-      const drawIn = ease(computeFaceT(fadeT, fi, NUM_FACES, WIRE_STAGGER_RATIO));
-      const fadeOut = ease(computeFaceT(fadeOutT, fi, NUM_FACES, WIRE_STAGGER_RATIO));
-      const drawProgress = drawIn * (1 - fadeOut);
+      // drawProgress is a single lerp between the two rows' wire poses.
+      // Same stagger in both directions, so draw-in and retract feel
+      // like the same hand doing the same stroke.
+      const wireT = ease(computeFaceT(localT, fi, NUM_FACES, WIRE_STAGGER_RATIO));
+      const drawProgress = wireFrom + (wireTo - wireFrom) * wireT;
 
       const wireMat = wires[fi].material as THREE.ShaderMaterial;
       wireMat.uniforms.uProgress.value = drawProgress;

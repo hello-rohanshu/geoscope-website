@@ -30,6 +30,15 @@ const WIRE_STAGGER_RATIO: number = 0.5;
 /** Maximum target opacity of wireframe lines once drawn. */
 const WIRE_MAX_OPACITY: number = 0.35;
 
+/** Camera distance (z) at the sphere stage. */
+const SPHERE_Z: number = 4.2;
+
+/** Camera distance (z) at the flat dymaxion stage. */
+const FLAT_Z: number = 2.6;
+
+/** Per-frame lerp toward the target camera distance. */
+const CAMERA_EASE: number = 0.1;
+
 // ── CUSTOM SHADERS FOR HAND-DRAWN WIREFRAME ────────────────────────────
 
 /**
@@ -344,7 +353,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100);
-    camera.position.set(0, 0, 4.2);
+    camera.position.set(0, 0, SPHERE_Z);
     cameraRef.current = camera;
 
     const grp = new THREE.Group();
@@ -381,7 +390,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
           uColor: { value: new THREE.Color(0xffffff) },
         },
         transparent: true,
-        depthTest: false, // ← TEMP
+        depthTest: false,
       });
 
       const wire = new THREE.LineSegments(wg, wireMaterial);
@@ -514,9 +523,18 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
           // Holds through stage 4 as well, so the flat net stays square-on while wires retract.
           const progress = animRef.current.t / SEGMENT_COUNT;
           const damping = 0.02 + progress * 0.06;
-          groupRef.current.rotation.x += (-0.04 - groupRef.current.rotation.x) * damping;
+          groupRef.current.rotation.x += (-0 - groupRef.current.rotation.x) * damping;
           groupRef.current.rotation.y += (0 - groupRef.current.rotation.y) * damping;
         }
+      }
+
+      const cam = cameraRef.current;
+      if (cam) {
+        const SPAN = GLOBE_STAGES.DYMAXION - GLOBE_STAGES.ICOSAHEDRON;
+        const flat = Math.min(1, Math.max(0,
+          (animRef.current.t - GLOBE_STAGES.ICOSAHEDRON) / SPAN));
+        const targetZ = SPHERE_Z + (FLAT_Z - SPHERE_Z) * flat;
+        cam.position.z += (targetZ - cam.position.z) * CAMERA_EASE;
       }
 
       rendererRef.current?.render(sceneRef.current!, cameraRef.current!);
@@ -542,7 +560,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
           display: 'block',
           cursor: 'grab',
           background: 'transparent',
-          border: '1px solid white',
+          border: '2px solid white',
           width: '100%',
           height: '100%',
           ...style,

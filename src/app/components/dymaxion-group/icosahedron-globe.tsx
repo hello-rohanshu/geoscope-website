@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
 import {
   SPHERE3D, SPHERE, FLAT, ease, bezier3, vertexKey, vertexControlMap, computeFaceT, NUM_FACES, SUB_BARY,
@@ -38,6 +38,13 @@ const FLAT_Z: number = 2.6;
 
 /** Per-frame lerp toward the target camera distance. */
 const CAMERA_EASE: number = 0.1;
+
+/** Map-mode zoom bounds. Zoom is a divisor on camera Z: zoom > 1 = closer. */
+const ZOOM_MIN: number = 0.5;
+const ZOOM_MAX: number = 4;
+
+/** Per-frame lerp for pan offset. Slightly snappier than camera ease. */
+const PAN_EASE: number = 0.2;
 
 // ── CUSTOM SHADERS FOR HAND-DRAWN WIREFRAME ────────────────────────────
 
@@ -123,9 +130,21 @@ interface IcosahedronGlobeProps {
   baseLayer?: FaceMaterialsOptions;
 }
 
+/**
+ * Imperative map-view API, exposed to the parent via ref. These only have
+ * a visible effect once the fold has reached DYMAXION — before that, the
+ * render loop gates them out. Kept imperative (not props) because they are
+ * commands, not state: zoom/pan don't belong in the React data flow.
+ */
+export interface GlobeControls {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetView: () => void;
+}
+
 // ──────────────────────────── COMPONENT ────────────────────────────
 
-const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
+const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
   width,
   height,
   stage = GLOBE_STAGES.SPHERE,
@@ -139,7 +158,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   overlayOpacity,
   baseLayer = { mode: 'debug' },
   ...canvasProps
-}) => {
+}, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<THREE.Group | null>(null);
@@ -155,11 +174,38 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
     frameId: 0,
   });
 
+  /**
+   * Map-mode view state. Only meaningful once the fold is fully flat.
+   * Values are read by the render loop (zoom → camera Z divisor, panX/Y →
+   * group position), and reset to identity by the stage effect whenever
+   * the fold is below DYMAXION.
+   */
+  const viewRef = useRef({ zoom: 1, panX: 0, panY: 0 });
+
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const overlayBuffersRef = useRef<OverlayBuffers | null>(null);
   const overlayPointsRef = useRef<THREE.Points | null>(null);
+
+  /**
+   * Expose the map-view API to the parent. Zoom steps are multiplicative
+   * so each click feels equally weighted regardless of current level.
+   * Reset returns to the exact default flat framing (centered, default Z).
+   */
+  useImperativeHandle(ref, () => ({
+    zoomIn: () => {
+      viewRef.current.zoom = Math.min(ZOOM_MAX, viewRef.current.zoom * 1.25);
+    },
+    zoomOut: () => {
+      viewRef.current.zoom = Math.max(ZOOM_MIN, viewRef.current.zoom / 1.25);
+    },
+    resetView: () => {
+      viewRef.current.zoom = 1;
+      viewRef.current.panX = 0;
+      viewRef.current.panY = 0;
+    },
+  }), []);
 
   /**
    * Core frame update function. Reads the STAGES table to know what the
@@ -372,6 +418,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       applyFaceSphereAttribute(geo, fi);
       const mesh = new THREE.Mesh(geo, faceMaterials[fi]);
       mesh.renderOrder = 0;
+      mesh.frustumCulled = false;
       grp.add(mesh);
       meshes.push(mesh);
 
@@ -395,6 +442,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
 
       const wire = new THREE.LineSegments(wg, wireMaterial);
       wire.visible = false;
+      wire.frustumCulled = false;
       grp.add(wire);
       wires.push(wire);
     });
@@ -404,7 +452,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
 
     updateGeometry(animRef.current.tgt);
 
-    // Mouse drag rotation listeners
+    // Mouse drag: rotate the globe in sphere mode, pan the map in flat mode.
     const onMouseDown = (e: MouseEvent) => {
       animRef.current.lastMouse = { x: e.clientX, y: e.clientY };
       animRef.current.drag = false;
@@ -412,15 +460,26 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
 
     const onMouseMove = (e: MouseEvent) => {
       const { lastMouse } = animRef.current;
-      if (!lastMouse) return;
+      if (!lastMouse || !groupRef.current) return;
       const dx = e.clientX - lastMouse.x;
       const dy = e.clientY - lastMouse.y;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) animRef.current.drag = true;
-      if (animRef.current.drag && groupRef.current) {
+      if (!animRef.current.drag) return;
+
+      // Flat map mode: drag slides the map. Spherical modes: drag rotates.
+      const isFlat = animRef.current.t >= GLOBE_STAGES.DYMAXION;
+      if (isFlat) {
+        // Screen pixels -> world units, scaled by current camera distance
+        // so panning feels consistent at any zoom level.
+        const z = cameraRef.current?.position.z ?? FLAT_Z;
+        const scale = 0.005 * (z / FLAT_Z);
+        viewRef.current.panX += dx * scale;
+        viewRef.current.panY -= dy * scale;
+      } else {
         groupRef.current.rotation.y += dx * 0.007;
         groupRef.current.rotation.x += dy * 0.007;
-        animRef.current.lastMouse = { x: e.clientX, y: e.clientY };
       }
+      animRef.current.lastMouse = { x: e.clientX, y: e.clientY };
     };
 
     const onMouseUp = () => {
@@ -430,9 +489,20 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       animRef.current.drag = false;
     };
 
+    // Wheel zoom: only in flat map mode. Before DYMAXION the event falls
+    // through so page scroll is never hijacked by the sphere stages.
+    const onWheel = (e: WheelEvent) => {
+      if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
+      e.preventDefault();
+      // Exponential response so each scroll notch is a constant % step.
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      viewRef.current.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, viewRef.current.zoom * factor));
+    };
+
     canvas.addEventListener('mousedown', onMouseDown);
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseup', onMouseUp);
+    canvas.addEventListener('wheel', onWheel, { passive: false });
 
     // Teardown WebGL memory references on unmount
     return () => {
@@ -440,6 +510,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       canvas.removeEventListener('mousedown', onMouseDown);
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseup', onMouseUp);
+      canvas.removeEventListener('wheel', onWheel);
       overlayPointsRef.current?.geometry.dispose();
       (overlayPointsRef.current?.material as THREE.Material | undefined)?.dispose();
       meshesRef.current.forEach((m) => {
@@ -486,6 +557,7 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
         size: overlaySize,
         opacity: overlayOpacity,
       });
+      points.frustumCulled = false;
       points.visible = showOverlay;
       grp.add(points);
       overlayBuffersRef.current = buffers;
@@ -513,6 +585,17 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
 
       updateGeometry(animRef.current.t);
 
+      const isFlat = animRef.current.t >= GLOBE_STAGES.DYMAXION;
+
+      // Pan: ease group position toward the stored pan offset. Outside
+      // flat mode, pan eases back to zero so the sphere is always centered.
+      if (groupRef.current) {
+        const targetPanX = isFlat ? viewRef.current.panX : 0;
+        const targetPanY = isFlat ? viewRef.current.panY : 0;
+        groupRef.current.position.x += (targetPanX - groupRef.current.position.x) * PAN_EASE;
+        groupRef.current.position.y += (targetPanY - groupRef.current.position.y) * PAN_EASE;
+      }
+
       // Automated camera/group orientation behavior
       if (!drag && groupRef.current) {
         if (animRef.current.tgt === GLOBE_STAGES.SPHERE && animRef.current.t < 0.05) {
@@ -531,9 +614,13 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       const cam = cameraRef.current;
       if (cam) {
         const SPAN = GLOBE_STAGES.DYMAXION - GLOBE_STAGES.ICOSAHEDRON;
-        const flat = Math.min(1, Math.max(0,
+        const foldProgress = Math.min(1, Math.max(0,
           (animRef.current.t - GLOBE_STAGES.ICOSAHEDRON) / SPAN));
-        const targetZ = SPHERE_Z + (FLAT_Z - SPHERE_Z) * flat;
+        const baseZ = SPHERE_Z + (FLAT_Z - SPHERE_Z) * foldProgress;
+        // User zoom is applied as a divisor on the fold-driven base Z.
+        // Ignored outside flat mode, so the fold's own camera move is untouched.
+        const zoom = isFlat ? viewRef.current.zoom : 1;
+        const targetZ = baseZ / zoom;
         cam.position.z += (targetZ - cam.position.z) * CAMERA_EASE;
       }
 
@@ -548,11 +635,18 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
   // Synchronize target stage from props
   useEffect(() => {
     animRef.current.tgt = stage;
+    // Folding away from the map resets the view so the sphere is never
+    // left off-center or over-zoomed when the animation returns to it.
+    if (stage < GLOBE_STAGES.DYMAXION) {
+      viewRef.current.zoom = 1;
+      viewRef.current.panX = 0;
+      viewRef.current.panY = 0;
+    }
     onStageChange?.(stage);
   }, [stage, onStageChange]);
 
   return (
-    <div ref={containerRef} className="w-full h-full">
+    <div ref={containerRef} className="w-full h-full" data-lenis-prevent>
       <canvas
         ref={canvasRef}
         className={className}
@@ -569,7 +663,9 @@ const IcosahedronGlobe: React.FC<IcosahedronGlobeProps> = ({
       />
     </div>
   );
-};
+});
+
+IcosahedronGlobe.displayName = 'IcosahedronGlobe';
 
 export default IcosahedronGlobe;
 export { GLOBE_STAGES };

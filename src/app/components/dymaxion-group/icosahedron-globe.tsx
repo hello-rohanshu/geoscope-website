@@ -40,11 +40,33 @@ const FLAT_Z: number = 2.6;
 const CAMERA_EASE: number = 0.1;
 
 /** Map-mode zoom bounds. Zoom is a divisor on camera Z: zoom > 1 = closer. */
-const ZOOM_MIN: number = 0.5;
-const ZOOM_MAX: number = 4;
+const ZOOM_MIN: number = 1;
+const ZOOM_MAX: number = 6.18;
 
 /** Per-frame lerp for pan offset. Slightly snappier than camera ease. */
-const PAN_EASE: number = 0.2;
+const PAN_EASE: number = 0.382;
+
+/** Slower ease used while a reset is in flight, so the view glides home. */
+const RESET_EASE = 0.0618;
+
+/** If true, wheel zoom keeps the point under the cursor fixed on screen.
+ *  If false, zoom is centered on the map center. */
+const ZOOM_TO_CURSOR: boolean = false;
+
+// Tight axis-aligned bounds of the flat Dymaxion net, computed once.
+// Used to clamp pan so the user can't drag the map off into empty space.
+const FLAT_BOUNDS = (() => {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const face of FLAT) {
+    for (const v of face) {
+      if (v.x < minX) minX = v.x;
+      if (v.x > maxX) maxX = v.x;
+      if (v.y < minY) minY = v.y;
+      if (v.y > maxY) maxY = v.y;
+    }
+  }
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, hx: (maxX - minX) / 2, hy: (maxY - minY) / 2 };
+})();
 
 // ── CUSTOM SHADERS FOR HAND-DRAWN WIREFRAME ────────────────────────────
 
@@ -181,6 +203,7 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
    * the fold is below DYMAXION.
    */
   const viewRef = useRef({ zoom: 1, panX: 0, panY: 0 });
+  const smoothViewRef = useRef(false);
 
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -201,6 +224,7 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
       viewRef.current.zoom = Math.max(ZOOM_MIN, viewRef.current.zoom / 1.25);
     },
     resetView: () => {
+      smoothViewRef.current = true;
       viewRef.current.zoom = 1;
       viewRef.current.panX = 0;
       viewRef.current.panY = 0;
@@ -456,6 +480,7 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
     const onMouseDown = (e: MouseEvent) => {
       animRef.current.lastMouse = { x: e.clientX, y: e.clientY };
       animRef.current.drag = false;
+      smoothViewRef.current = false;   // user takes over; cancel the reset glide
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -493,16 +518,84 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
     // through so page scroll is never hijacked by the sphere stages.
     const onWheel = (e: WheelEvent) => {
       if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
+      smoothViewRef.current = false;   // user takes over; cancel the reset glide
       e.preventDefault();
-      // Exponential response so each scroll notch is a constant % step.
+
+      const cam = cameraRef.current;
+      if (!cam) return;
+
+      const v = viewRef.current;
+      const zoomOld = v.zoom;
       const factor = Math.exp(-e.deltaY * 0.0015);
-      viewRef.current.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, viewRef.current.zoom * factor));
+      const zoomNew = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomOld * factor));
+      if (zoomNew === zoomOld) return;
+
+      if (ZOOM_TO_CURSOR) {
+        // Cursor position in [-1, 1], Y up. Center of canvas is (0, 0).
+        const rect = canvas.getBoundingClientRect();
+        const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const ny = 1 - ((e.clientY - rect.top) / rect.height) * 2;
+
+        // World half-extents of the visible frustum at old vs new zoom.
+        const tanHalfFov = Math.tan((cam.fov * Math.PI) / 360);
+        const halfH_old = (FLAT_Z / zoomOld) * tanHalfFov;
+        const halfH_new = (FLAT_Z / zoomNew) * tanHalfFov;
+        const halfW_old = halfH_old * cam.aspect;
+        const halfW_new = halfH_new * cam.aspect;
+
+        // Shift pan so the map point under the cursor stays put on screen.
+        v.panX += nx * (halfW_new - halfW_old);
+        v.panY += ny * (halfH_new - halfH_old);
+      }
+
+      v.zoom = zoomNew;
+    };
+
+    const onDoubleClick = (e: MouseEvent) => {
+      if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
+      if (animRef.current.drag) return;   // ignore if the click was really a drag
+
+      const v = viewRef.current;
+      const cam = cameraRef.current;
+      if (!cam) return;
+
+      // Any zoom beyond origin → reset home.
+      if (v.zoom > 1.001) {
+        smoothViewRef.current = true;
+        v.zoom = 1;
+        v.panX = 0;
+        v.panY = 0;
+        return;
+      }
+
+      // Smooth glide for both pan and camera — same as reset.
+      smoothViewRef.current = true;
+
+      // At origin → zoom all the way in, anchored at the cursor.
+      const zoomOld = v.zoom;
+      const zoomNew = ZOOM_MAX;
+      if (zoomNew === zoomOld) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const ny = 1 - ((e.clientY - rect.top) / rect.height) * 2;
+
+      const tanHalfFov = Math.tan((cam.fov * Math.PI) / 360);
+      const halfH_old = (FLAT_Z / zoomOld) * tanHalfFov;
+      const halfH_new = (FLAT_Z / zoomNew) * tanHalfFov;
+      const halfW_old = halfH_old * cam.aspect;
+      const halfW_new = halfH_new * cam.aspect;
+
+      v.panX += nx * (halfW_new - halfW_old);
+      v.panY += ny * (halfH_new - halfH_old);
+      v.zoom = zoomNew;
     };
 
     canvas.addEventListener('mousedown', onMouseDown);
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseup', onMouseUp);
     canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('dblclick', onDoubleClick);
 
     // Teardown WebGL memory references on unmount
     return () => {
@@ -511,6 +604,7 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseup', onMouseUp);
       canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('dblclick', onDoubleClick);
       overlayPointsRef.current?.geometry.dispose();
       (overlayPointsRef.current?.material as THREE.Material | undefined)?.dispose();
       meshesRef.current.forEach((m) => {
@@ -587,13 +681,25 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
 
       const isFlat = animRef.current.t >= GLOBE_STAGES.DYMAXION;
 
+      // Clamp pan so the map can't be dragged past its own edges.
+      // Limit grows with zoom: at zoom=1 (whole net visible) it's ~0.
+      const zoom = isFlat ? viewRef.current.zoom : 1;
+      const LEEWAY_X = 1;
+      const LEEWAY_Y = 1.618;
+      const limitX = FLAT_BOUNDS.hx * (LEEWAY_X + (1 - 1 / zoom));
+      const limitY = FLAT_BOUNDS.hy * (LEEWAY_Y + (1 - 1 / zoom));
+      viewRef.current.panX = Math.max(-limitX, Math.min(limitX, viewRef.current.panX));
+      viewRef.current.panY = Math.max(-limitY, Math.min(limitY, viewRef.current.panY));
+
       // Pan: ease group position toward the stored pan offset. Outside
       // flat mode, pan eases back to zero so the sphere is always centered.
       if (groupRef.current) {
         const targetPanX = isFlat ? viewRef.current.panX : 0;
         const targetPanY = isFlat ? viewRef.current.panY : 0;
-        groupRef.current.position.x += (targetPanX - groupRef.current.position.x) * PAN_EASE;
-        groupRef.current.position.y += (targetPanY - groupRef.current.position.y) * PAN_EASE;
+        // Only use the slow ease when resetting. Otherwise, use the snappy ease.
+        const panEase = smoothViewRef.current ? RESET_EASE : PAN_EASE;
+        groupRef.current.position.x += (targetPanX - groupRef.current.position.x) * panEase;
+        groupRef.current.position.y += (targetPanY - groupRef.current.position.y) * panEase;
       }
 
       // Automated camera/group orientation behavior
@@ -619,9 +725,9 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
         const baseZ = SPHERE_Z + (FLAT_Z - SPHERE_Z) * foldProgress;
         // User zoom is applied as a divisor on the fold-driven base Z.
         // Ignored outside flat mode, so the fold's own camera move is untouched.
-        const zoom = isFlat ? viewRef.current.zoom : 1;
         const targetZ = baseZ / zoom;
-        cam.position.z += (targetZ - cam.position.z) * CAMERA_EASE;
+        const camEase = smoothViewRef.current ? RESET_EASE : CAMERA_EASE;
+        cam.position.z += (targetZ - cam.position.z) * camEase;
       }
 
       rendererRef.current?.render(sceneRef.current!, cameraRef.current!);

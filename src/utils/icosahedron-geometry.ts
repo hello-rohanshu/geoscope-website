@@ -22,7 +22,9 @@ export const MAP_ROTATION_DEG = 120;
 // How far (in unit-sphere radii) each corner's bezier control point is
 // pushed outward along its own normal during the icosahedron→dymaxion
 // fold. Controls how "ballooned" the intermediate fold looks.
-export const FLARE_AMOUNT = 0.7;
+export const FLARE_AMOUNT = 0.0;
+export const FLAT_OFFSET_X = -0.025;
+export const FLAT_OFFSET_Y = -0.085;
 
 // ── Shared types ──────────────────────────────────────────────────────
 export type Triangle3D = [[number, number, number], [number, number, number], [number, number, number]];
@@ -240,7 +242,11 @@ export const FLAT: THREE.Vector3[][] = FLAT2D.map((f: Triangle2D) =>
   f.map(([x, y]: Point2D) => {
     const rx = (x - cx) * SC;
     const ry = (-(y - cy)) * SC;
-    return new THREE.Vector3(rx * cosR - ry * sinR, rx * sinR + ry * cosR, 0);
+    return new THREE.Vector3(
+      rx * cosR - ry * sinR + FLAT_OFFSET_X,
+      rx * sinR + ry * cosR + FLAT_OFFSET_Y,
+      0
+    );
   })
 );
 
@@ -339,7 +345,7 @@ export const SUB_BARY: [number, number, number][] = makeSubBary(SUBDIVISION_LEVE
 export const FACE_SPHERE_POSITIONS: Float32Array[] = SPHERE3D.map((face) => {
   const arr = new Float32Array(SUB_BARY.length * 3);
   SUB_BARY.forEach(([w0, w1, w2], i) => {
-    arr[i * 3]     = w0 * face[0][0] + w1 * face[1][0] + w2 * face[2][0];
+    arr[i * 3] = w0 * face[0][0] + w1 * face[1][0] + w2 * face[2][0];
     arr[i * 3 + 1] = w0 * face[0][1] + w1 * face[1][1] + w2 * face[2][1];
     arr[i * 3 + 2] = w0 * face[0][2] + w1 * face[1][2] + w2 * face[2][2];
   });
@@ -396,11 +402,11 @@ export interface StageDef {
 }
 
 export const STAGES: readonly StageDef[] = [
-  { name: 'SPHERE',              mesh: 'sphere', wires: 'none', duration: 1.618 },
+  { name: 'SPHERE', mesh: 'sphere', wires: 'none', duration: 1.618 },
   { name: 'SPHERE_TRIANGULATED', mesh: 'sphere', wires: 'full', duration: 1.0 },
-  { name: 'ICOSAHEDRON',         mesh: 'facet',  wires: 'full', duration: 1.0 },
-  { name: 'DYMAXION',            mesh: 'flat',   wires: 'full', duration: 1.618 },
-  { name: 'WIRES_GONE',          mesh: 'flat',   wires: 'none', duration: 0   },
+  { name: 'ICOSAHEDRON', mesh: 'facet', wires: 'full', duration: 1.0 },
+  { name: 'DYMAXION', mesh: 'flat', wires: 'full', duration: 1.618 },
+  { name: 'WIRES_GONE', mesh: 'flat', wires: 'none', duration: 0 },
 ] as const;
 
 // Cumulative start time of each stage along the t timeline.
@@ -420,11 +426,11 @@ const STAGE_START: readonly number[] = (() => {
 // total duration of the fold. Consumers should always use the named
 // keys, never the raw numbers.
 export const GLOBE_STAGES = {
-  SPHERE:              STAGE_START[0],
+  SPHERE: STAGE_START[0],
   SPHERE_TRIANGULATED: STAGE_START[1],
-  ICOSAHEDRON:         STAGE_START[2],
-  DYMAXION:            STAGE_START[3],
-  WIRES_GONE:          STAGE_START[4],
+  ICOSAHEDRON: STAGE_START[2],
+  DYMAXION: STAGE_START[3],
+  WIRES_GONE: STAGE_START[4],
 } as const;
 
 export const STAGE_COUNT = STAGES.length;

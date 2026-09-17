@@ -403,8 +403,8 @@ export interface StageDef {
 
 export const STAGES: readonly StageDef[] = [
   { name: 'SPHERE', mesh: 'sphere', wires: 'none', duration: 1.618 },
-  { name: 'SPHERE_TRIANGULATED', mesh: 'sphere', wires: 'full', duration: 1.0 },
-  { name: 'ICOSAHEDRON', mesh: 'facet', wires: 'full', duration: 1.0 },
+  { name: 'SPHERE_TRIANGULATED', mesh: 'sphere', wires: 'full', duration: 1.618 },
+  { name: 'ICOSAHEDRON', mesh: 'facet', wires: 'full', duration: 1.618 },
   { name: 'DYMAXION', mesh: 'flat', wires: 'full', duration: 1.618 },
   { name: 'WIRES_GONE', mesh: 'flat', wires: 'none', duration: 0 },
 ] as const;

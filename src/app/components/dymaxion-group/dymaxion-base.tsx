@@ -3,13 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import IcosahedronGlobe from "./icosahedron-globe";
-import { GLOBE_STAGES, SEGMENT_COUNT } from "@/utils/icosahedron-geometry";
+import { GLOBE_STAGES } from "@/utils/icosahedron-geometry";
 import { loadRaster } from "@/utils/raster-engine";
 import { collectRasterSamples, OverlaySample } from "@/utils/overlay-layer";
 
-// ── Layer registry ────────────────────────────────────────────────────
-// Add new rasters here. Each is loaded and cached in raster-engine under
-// its `id`, so switching between them is instant after first load.
 type LayerId = "population" | "blackmarble";
 
 interface LayerDef {
@@ -24,21 +21,10 @@ interface LayerDef {
   stride?: number;
 }
 
-// ── To add a raster ───────────────────────────────────────────────────
-//   1. drop the .tif in /public/
-//   2. widen LayerId with a new string literal
-//   3. append a LayerDef below
-// Tuning:
-//   threshold  = min cell value to keep (know your raster's range;
-//                0–255 for grayscale, 0–1 for normalized, etc.)
-//   stride     = sample every Nth pixel in x and y (use 2–4 for
-//                rasters bigger than ~2000px per side)
-//   maxSamples = hard cap; keeps buildOverlayBuffers from freezing
-
 const LAYERS: LayerDef[] = [
   {
     id: "population",
-    label: "Population",
+    label: "Population Density (2024)",
     url: "/population_2024_1440x720_cog.tif",
     color: "#ff3b3b",
     size: 0.012,
@@ -52,9 +38,9 @@ const LAYERS: LayerDef[] = [
     color: "#ffd97a",
     size: 0.006,
     opacity: 0.5,
-    threshold: 40,          // 0–255 gray; raise if too many dots
-    maxSamples: 200_000,    // hard cap so buildOverlayBuffers doesn't freeze
-    stride: 2,              // 3km raster is big; every other pixel is plenty
+    threshold: 40,
+    maxSamples: 200_000,
+    stride: 2,
   },
 ];
 
@@ -65,9 +51,6 @@ export default function DymaxionBase() {
   const [earthTexture, setEarthTexture] = useState<THREE.Texture | null>(null);
   const [stage, setStage] = useState<number>(GLOBE_STAGES.SPHERE);
 
-  // Cache collected samples per layer so flipping back is instant. The
-  // decoded raster is already cached in raster-engine; this just saves
-  // re-iterating 100k+ cells each time you switch.
   const samplesCacheRef = useRef<Map<LayerId, OverlaySample[]>>(new Map());
 
   // Load Earth texture
@@ -82,7 +65,7 @@ export default function DymaxionBase() {
     setEarthTexture(tex);
   }, []);
 
-  // Load / switch the active raster layer.
+  // Load / switch active raster layer
   useEffect(() => {
     if (!activeLayerId) {
       setSamples([]);
@@ -128,100 +111,159 @@ export default function DymaxionBase() {
     : null;
 
   const atFlat = stage >= GLOBE_STAGES.DYMAXION;
+  const isUnfolded = stage >= GLOBE_STAGES.WIRES_GONE;
 
   return (
-    <div className="relative w-full p-4 sm:p-8 lg:p-12 flex flex-col lg:flex-row lg:items-start gap-6 lg:gap-8 bg-transparent">
-      {/* Stage Play/Reset toggle */}
-      <div className="absolute top-4 right-4 z-10">
+    <div className="w-full flex flex-col items-center pointer-events-auto select-none">
+      {/* Header Bar */}
+      <div className="w-full mb-3 md:mb-4 flex items-center justify-between shrink-0">
+        {/* <h1 className="title-section">Dymaxion Projection</h1> */}
+
+        {/* 
+            INTENTIONALITY: Equalized button geometry (`w-36 h-9`) matching design tokens.
+            No borders; surface elevation distinguish state changes cleanly without jumps.
+        */}
         <button
           type="button"
           onClick={() =>
-            setStage(stage >= GLOBE_STAGES.WIRES_GONE ? GLOBE_STAGES.SPHERE : GLOBE_STAGES.WIRES_GONE)
+            setStage(
+              isUnfolded ? GLOBE_STAGES.SPHERE : GLOBE_STAGES.WIRES_GONE
+            )
           }
-          className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-semibold tracking-wide transition-colors shadow-lg"
+          className="w-36 h-9 flex items-center justify-center text-xs md:text-sm font-medium transition-colors duration-200 cursor-pointer outline-none shrink-0"
+          style={{
+            background: isUnfolded
+              ? "var(--color-surface-elevated)"
+              : "var(--color-surface)",
+            color: isUnfolded
+              ? "var(--color-text)"
+              : "var(--color-header-text)",
+            boxShadow: "var(--color-shadow)",
+          }}
         >
-          {stage >= GLOBE_STAGES.WIRES_GONE ? 'Reset' : 'Play'}
+          {isUnfolded ? "Fold" : "Unfold"}
         </button>
       </div>
 
-      {/* Left Column: Map + Timeline */}
-      <div className="flex flex-col gap-6 flex-[2]">
-        {/* Globe Container */}
-        <div className="w-full max-w-[720px] mx-auto aspect-[2/1] max-h-[38vh] rounded-2xl shadow-xl overflow-hidden">
-          {earthTexture ? (
-            <IcosahedronGlobe
-              stage={stage}
-              onStageChange={setStage}
-              overlaySamples={samples}
-              showOverlay={activeLayerId !== null}
-              overlayColor={activeLayer?.color}
-              overlaySize={activeLayer?.size}
-              overlayOpacity={activeLayer?.opacity}
-              baseLayer={{ mode: "texture", texture: earthTexture }}
-            />
-          ) : (
-            <IcosahedronGlobe
-              stage={stage}
-              onStageChange={setStage}
-              overlaySamples={samples}
-              showOverlay={activeLayerId !== null}
-              overlayColor={activeLayer?.color}
-              overlaySize={activeLayer?.size}
-              overlayOpacity={activeLayer?.opacity}
-              baseLayer={{ mode: "debug" }}
-            />
-          )}
+      {/* 
+          INTENTIONALITY: Unframed Grid with Zero Borders.
+          Panels use exact CSS system tokens (`var(--color-surface)`, `var(--color-surface-elevated)`) 
+          and native shadows to float seamlessly over the site backdrop.
+      */}
+      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        
+        {/* Canvas & Timeline Track */}
+        <div className="lg:col-span-2 w-full flex flex-col gap-3">
+          <div
+            className="w-full aspect-[2/1] max-h-[420px] relative overflow-hidden flex items-center justify-center"
+            style={{
+              background: "var(--color-surface-elevated)",
+              boxShadow: "var(--color-shadow)",
+            }}
+          >
+            {earthTexture ? (
+              <IcosahedronGlobe
+                stage={stage}
+                onStageChange={setStage}
+                overlaySamples={samples}
+                showOverlay={activeLayerId !== null}
+                overlayColor={activeLayer?.color}
+                overlaySize={activeLayer?.size}
+                overlayOpacity={activeLayer?.opacity}
+                baseLayer={{ mode: "texture", texture: earthTexture }}
+              />
+            ) : (
+              <IcosahedronGlobe
+                stage={stage}
+                onStageChange={setStage}
+                overlaySamples={samples}
+                showOverlay={activeLayerId !== null}
+                overlayColor={activeLayer?.color}
+                overlaySize={activeLayer?.size}
+                overlayOpacity={activeLayer?.opacity}
+                baseLayer={{ mode: "debug" }}
+              />
+            )}
+          </div>
+
+          <div
+            className={`w-full h-9 flex items-center justify-center text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${
+              atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+            style={{
+              background: "var(--color-progress-track)",
+              color: "var(--color-text-muted)",
+            }}
+          >
+            Timeline Track
+          </div>
         </div>
 
-        {/* Timeline Placeholder — only at dymaxion stage */}
-        {atFlat && (
-          <div className="w-full h-16 bg-gray-800 rounded-lg border border-gray-600 flex items-center justify-center text-gray-400 font-mono text-sm px-4">
-            Timeline will appear here
-          </div>
-        )}
-      </div>
-
-      {/* Right Column: Controls + Cards — only at dymaxion stage */}
-      {atFlat && (
-        <div className="flex flex-col gap-6 flex-[1] min-w-0 lg:min-w-[280px]">
-          <div className="bg-gray-800 rounded-lg border border-gray-600 p-4 space-y-3 flex-1">
-            <div className="text-gray-300 font-semibold tracking-wide">
+        {/* Floating Overlay Controls */}
+        <div
+          className={`lg:col-span-1 w-full transition-opacity duration-300 ${
+            atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        >
+          <div
+            className="p-5 flex flex-col gap-3"
+            style={{
+              background: "var(--color-surface)",
+              boxShadow: "var(--color-shadow)",
+            }}
+          >
+            <h2
+              className="title-card"
+              style={{ color: "var(--color-header-text)" }}
+            >
               Overlays
-            </div>
+            </h2>
 
-            <label className="flex items-center gap-3 text-gray-300 cursor-pointer select-none">
-              <input
-                type="radio"
-                name="layer"
-                checked={activeLayerId === null}
-                onChange={() => setActiveLayerId(null)}
-                className="accent-red-500"
-              />
-              <span>Off</span>
-            </label>
-
-            {LAYERS.map((l) => (
+            <div className="flex flex-col gap-2">
               <label
-                key={l.id}
-                className="flex items-center gap-3 text-gray-300 cursor-pointer select-none"
+                className="flex items-center gap-3 text-sm cursor-pointer select-none transition-colors duration-150"
+                style={{ color: "var(--color-text)" }}
               >
                 <input
                   type="radio"
                   name="layer"
-                  checked={activeLayerId === l.id}
-                  onChange={() => setActiveLayerId(l.id)}
-                  className="accent-red-500"
+                  checked={activeLayerId === null}
+                  onChange={() => setActiveLayerId(null)}
+                  className="accent-[var(--color-accent)] cursor-pointer"
                 />
-                <span>{l.label}</span>
+                <span>Off</span>
               </label>
-            ))}
+
+              {LAYERS.map((l) => (
+                <label
+                  key={l.id}
+                  className="flex items-center gap-3 text-sm cursor-pointer select-none transition-colors duration-150"
+                  style={{ color: "var(--color-text)" }}
+                >
+                  <input
+                    type="radio"
+                    name="layer"
+                    checked={activeLayerId === l.id}
+                    onChange={() => setActiveLayerId(l.id)}
+                    className="accent-[var(--color-accent)] cursor-pointer"
+                  />
+                  <span>{l.label}</span>
+                </label>
+              ))}
+            </div>
 
             {loading && (
-              <div className="text-gray-500 text-xs pt-1">Loading…</div>
+              <div
+                className="text-xs pt-1"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Loading raster data…
+              </div>
             )}
           </div>
         </div>
-      )}
+
+      </div>
     </div>
   );
 }

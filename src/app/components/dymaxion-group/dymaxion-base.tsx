@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import IcosahedronGlobe from "./icosahedron-globe";
+import IcosahedronGlobe, { type GlobeControls } from "./icosahedron-globe";
 import { GLOBE_STAGES } from "@/utils/icosahedron-geometry";
 import { loadRaster } from "@/utils/raster-engine";
 import { collectRasterSamples, OverlaySample } from "@/utils/overlay-layer";
@@ -52,6 +52,13 @@ export default function DymaxionBase() {
   const [stage, setStage] = useState<number>(GLOBE_STAGES.SPHERE);
 
   const samplesCacheRef = useRef<Map<LayerId, OverlaySample[]>>(new Map());
+
+  /**
+   * Imperative handle to the globe's map-view API. Zoom and reset are
+   * commands, not state — they bypass React's render cycle on purpose,
+   * so a wheel-scroll or button-mash never re-renders the whole tree.
+   */
+  const globeRef = useRef<GlobeControls>(null);
 
   // Load Earth texture
   useEffect(() => {
@@ -163,6 +170,7 @@ export default function DymaxionBase() {
           >
             {earthTexture ? (
               <IcosahedronGlobe
+                ref={globeRef}
                 stage={stage}
                 onStageChange={setStage}
                 overlaySamples={samples}
@@ -174,6 +182,7 @@ export default function DymaxionBase() {
               />
             ) : (
               <IcosahedronGlobe
+                ref={globeRef}
                 stage={stage}
                 onStageChange={setStage}
                 overlaySamples={samples}
@@ -184,6 +193,62 @@ export default function DymaxionBase() {
                 baseLayer={{ mode: "debug" }}
               />
             )}
+          </div>
+
+          {/* 
+              INTENTIONALITY: Map controls fade in only once the fold has settled flat.
+              Zoom and pan have no meaning on a sphere, so rendering them earlier
+              would be dead chrome. `tabIndex` is mirrored to the same gate so
+              keyboard users can't tab into invisible, unusable buttons — the same
+              discipline the `pointer-events-none` class already enforces for mice.
+          */}
+          <div
+            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${
+              atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+            aria-hidden={!atFlat}
+          >
+            <button
+              type="button"
+              onClick={() => globeRef.current?.zoomIn()}
+              aria-label="Zoom in"
+              tabIndex={atFlat ? 0 : -1}
+              className="w-9 h-9 flex items-center justify-center text-base font-medium cursor-pointer outline-none"
+              style={{
+                background: "var(--color-surface)",
+                color: "var(--color-header-text)",
+                boxShadow: "var(--color-shadow)",
+              }}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={() => globeRef.current?.zoomOut()}
+              aria-label="Zoom out"
+              tabIndex={atFlat ? 0 : -1}
+              className="w-9 h-9 flex items-center justify-center text-base font-medium cursor-pointer outline-none"
+              style={{
+                background: "var(--color-surface)",
+                color: "var(--color-header-text)",
+                boxShadow: "var(--color-shadow)",
+              }}
+            >
+              −
+            </button>
+            <button
+              type="button"
+              onClick={() => globeRef.current?.resetView()}
+              tabIndex={atFlat ? 0 : -1}
+              className="h-9 px-4 flex items-center justify-center text-xs md:text-sm font-medium cursor-pointer outline-none"
+              style={{
+                background: "var(--color-surface)",
+                color: "var(--color-header-text)",
+                boxShadow: "var(--color-shadow)",
+              }}
+            >
+              Reset view
+            </button>
           </div>
 
           <div

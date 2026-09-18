@@ -2,12 +2,13 @@
 
 import { useEffect, ReactNode } from 'react';
 import Lenis from 'lenis';
-import GeoscopeCanvas from '@/app/components/GeoscopeCanvas';
+import GeoscopeScene from '@/app/components/scene/GeoscopeScene';
+import { useDymaxionState } from '@/app/components/dymaxion-group/use-dymaxion-state';
 import HumanityTimeline from '@/app/components/timeline/humanity-timeline';
 import GeoscopeTitleCard from '@/app/components/title-card';
 import DomainPanels from '@/app/components/domain-panels';
 import DesignScienceProgress from '@/app/components/design-science-progress';
-import DymaxionBase from "@/app/components/dymaxion-group/dymaxion-base";
+import DymaxionBase from '@/app/components/dymaxion-group/dymaxion-base';
 
 // Reusable full-screen layout wrapper providing site-wide boundary/padding
 function Section({
@@ -29,6 +30,8 @@ function Section({
 }
 
 export default function Home() {
+  const dymaxion = useDymaxionState();
+
   useEffect(() => {
     const lenis = new Lenis({
       duration: 1.6,
@@ -52,12 +55,31 @@ export default function Home() {
   return (
     <main className="relative text-white overflow-x-hidden">
 
-      <Section className="z-10">
-        <GeoscopeCanvas />
-      </Section>
+      <GeoscopeScene
+        ref={dymaxion.globeRef}
+        stage={dymaxion.stage}
+        onStageChange={dymaxion.setStage}
+        overlaySamples={dymaxion.samples}
+        showOverlay={dymaxion.activeLayerId !== null}
+        overlayColor={dymaxion.activeLayer?.color}
+        overlaySize={dymaxion.activeLayer?.size}
+        overlayOpacity={dymaxion.activeLayer?.opacity}
+        baseLayer={
+          dymaxion.earthTexture
+            ? { mode: 'texture', texture: dymaxion.earthTexture }
+            : { mode: 'debug' }
+        }
+      />
 
       <Section className="z-10">
-        <DymaxionBase />
+        <DymaxionBase
+          stage={dymaxion.stage}
+          setStage={dymaxion.setStage}
+          activeLayerId={dymaxion.activeLayerId}
+          setActiveLayerId={dymaxion.setActiveLayerId}
+          loading={dymaxion.loading}
+          globeRef={dymaxion.globeRef}
+        />
       </Section>
 
       <Section className="relative z-20">

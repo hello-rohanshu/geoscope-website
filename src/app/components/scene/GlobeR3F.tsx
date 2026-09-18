@@ -1,0 +1,768 @@
+'use client';
+
+import {
+  useRef, useEffect, useCallback, useImperativeHandle, useMemo, forwardRef,
+  type RefObject,
+} from 'react';
+import * as THREE from 'three';
+import { useGesture } from '@use-gesture/react';
+import { useThree, useFrame } from '@react-three/fiber';
+import {
+  SPHERE3D, SPHERE, FLAT, ease, bezier3, vertexKey, vertexControlMap, computeFaceT, NUM_FACES, SUB_BARY,
+  GLOBE_STAGES, SEGMENT_COUNT, resolveSegment, STAGES,
+} from '@/utils/icosahedron-geometry';
+
+import {
+  OverlayBuffers, OverlaySample, buildOverlayBuffers, updateOverlayPositions, createOverlayPoints,
+} from '@/utils/overlay-layer';
+
+import {
+  createFaceMaterials, applyFaceSphereAttribute,
+  type BaseLayerMode, type FaceMaterialsOptions,
+} from '@/utils/face-materials';
+
+// ──────────────────────────── CONFIGURATION ────────────────────────────
+// Every constant below is copied verbatim from icosahedron-globe.tsx.
+// Do not retune these as part of reviewing this port — see port spec §5.
+
+/** How far the playhead advances per frame, in t-units. Pairs with the
+ *  per-stage `duration` in STAGES: this is "how fast pages turn," that
+ *  is "how many pages each chapter has." */
+const PLAYHEAD_RATE: number = 0.03;
+
+/** Fold animation delay across faces: 0 = lockstep movement, >0 = wave/cascade across faces. */
+const STAGGER_RATIO: number = 0.0;
+
+/** Wireframe draw-in/out stagger ratio across faces. Used for both directions. */
+const WIRE_STAGGER_RATIO: number = 0.5;
+
+/** Maximum target opacity of wireframe lines once drawn. */
+const WIRE_MAX_OPACITY: number = 0.35;
+
+/** Camera distance (z) at the sphere stage. */
+const SPHERE_Z: number = 4.2;
+
+/** Camera distance (z) at the flat dymaxion stage. */
+const FLAT_Z: number = 2.6;
+
+/** Per-frame lerp toward the target camera distance. */
+const CAMERA_EASE: number = 0.1;
+
+/** Map-mode zoom bounds. Zoom is a divisor on camera Z: zoom > 1 = closer. */
+const ZOOM_MIN: number = 1;
+const ZOOM_MAX: number = 6.18;
+
+/** Per-frame lerp for pan offset. Slightly snappier than camera ease. */
+const PAN_EASE: number = 0.382;
+
+/** Slower ease used while a reset is in flight, so the view glides home. */
+const RESET_EASE = 0.0618;
+
+/** If true, wheel zoom keeps the point under the cursor fixed on screen.
+ *  If false, zoom is centered on the map center. */
+const ZOOM_TO_CURSOR: boolean = false;
+
+// Tight axis-aligned bounds of the flat Dymaxion net, computed once.
+// Used to clamp pan so the user can't drag the map off into empty space.
+const FLAT_BOUNDS = (() => {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const face of FLAT) {
+    for (const v of face) {
+      if (v.x < minX) minX = v.x;
+      if (v.x > maxX) maxX = v.x;
+      if (v.y < minY) minY = v.y;
+      if (v.y > maxY) maxY = v.y;
+    }
+  }
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, hx: (maxX - minX) / 2, hy: (maxY - minY) / 2 };
+})();
+
+// ── CUSTOM SHADERS FOR HAND-DRAWN WIREFRAME ────────────────────────────
+
+/**
+ * Vertex shader for wireframe edges.
+ * Receives `lineProgress` (0 at start vertex, 1 at end vertex) and adds
+ * subtle spatial jitter via sine/cosine trigonometric noise to simulate hand strokes.
+ */
+const WIRE_VERTEX_SHADER = `
+  attribute float lineProgress;
+  varying float vProgress;
+
+  void main() {
+    vProgress = lineProgress;
+    vec3 pos = position;
+
+    // High-frequency trigonometric perturbation for sketchy/hand-drawn line variation
+    pos += vec3(
+      sin(pos.y * 30.0 + pos.z * 20.0) * 0.0015,
+      cos(pos.x * 30.0 + pos.z * 20.0) * 0.0015,
+      sin(pos.x * 20.0 + pos.y * 30.0) * 0.0015
+    );
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  }
+`;
+
+/**
+ * Fragment shader for wireframe edges.
+ * Uses `vProgress` and `uProgress` to trim lines, creating a progressive drawing animation.
+ * Smoothstep feathering creates a soft tapered pencil/pen stroke tip.
+ *
+ * Note: `smoothstep(a, b, x)` in GLSL is undefined when a > b. To get a
+ * reversed ramp for the "tip fade", we negate the input instead of swapping
+ * edges — this keeps the edge order valid on all drivers.
+ */
+const WIRE_FRAGMENT_SHADER = `
+  uniform float uProgress;
+  uniform float uMaxOpacity;
+  uniform vec3 uColor;
+  varying float vProgress;
+
+  void main() {
+    // Discard fragments beyond current animation threshold
+    if (vProgress > uProgress || uProgress <= 0.001) discard;
+
+    // Smooth stroke tip attenuation (taper effect at edge of drawing boundary).
+    // Fades opacity from 1 -> 0 as vProgress approaches uProgress from below.
+    float tipFade = smoothstep(0.0, 0.15, uProgress - vProgress);
+    gl_FragColor = vec4(uColor, uMaxOpacity * tipFade);
+  }
+`;
+
+// ── TYPES & INTERFACES ──────────────────────────────────────────────────
+
+/** Internal animation state mutated directly within useFrame to bypass React renders.
+ *  (The raw-Three version also carried a `frameId` field here for its manual
+ *  requestAnimationFrame handle — dropped, since R3F's useFrame owns frame
+ *  scheduling now and there's no id left to cancel.) */
+interface AnimState {
+  /** Current fractional stage position [0..SEGMENT_COUNT]. */
+  t: number;
+  /** Target stage position [0..SEGMENT_COUNT]. */
+  tgt: number;
+  /** Whether the user is actively dragging to rotate the globe. */
+  drag: boolean;
+}
+
+export interface GlobeR3FProps {
+  /** Target globe stage: 0=sphere, 1=triangulated sphere, 2=icosahedron, 3=dymaxion, 4=wires gone. Fractional values supported. */
+  stage?: number;
+  onStageChange?: (stage: number) => void;
+  overlaySamples?: OverlaySample[];
+  showOverlay?: boolean;
+  overlayColor?: string;
+  overlaySize?: number;
+  overlayOpacity?: number;
+  baseLayer?: FaceMaterialsOptions;
+  /**
+   * Ref to this component's root <group>, owned by the parent (SceneContent).
+   * SceneContent reads its rotation every frame to drive the star field's
+   * coupled rotation (port spec §7) — GlobeR3F only writes to it, via the
+   * same rotation/position logic the raw-Three version applied to its own
+   * internal groupRef.
+   */
+  groupRef: RefObject<THREE.Group | null>;
+}
+
+/**
+ * Imperative map-view API, exposed to the parent via ref. These only have
+ * a visible effect once the fold has reached DYMAXION — before that, the
+ * render loop gates them out. Kept imperative (not props) because they are
+ * commands, not state: zoom/pan don't belong in the React data flow.
+ */
+export interface GlobeControls {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetView: () => void;
+}
+
+// ──────────────────────────── COMPONENT ────────────────────────────
+
+const GlobeR3F = forwardRef<GlobeControls, GlobeR3FProps>(function GlobeR3F({
+  stage = GLOBE_STAGES.SPHERE,
+  onStageChange,
+  overlaySamples,
+  showOverlay = true,
+  overlayColor,
+  overlaySize,
+  overlayOpacity,
+  baseLayer = { mode: 'debug' },
+  groupRef,
+}, ref) {
+  const meshesRef = useRef<THREE.Mesh[]>([]);
+  const wiresRef = useRef<THREE.LineSegments[]>([]);
+
+  // Mutable animation state container to avoid react re-renders on every frame
+  const animRef = useRef<AnimState>({
+    t: stage,
+    tgt: stage,
+    drag: false,
+  });
+
+  /**
+   * Map-mode view state. Only meaningful once the fold is fully flat.
+   * Values are read by the render loop (zoom → camera Z divisor, panX/Y →
+   * group position), and reset to identity by the stage effect whenever
+   * the fold is below DYMAXION.
+   */
+  const viewRef = useRef({ zoom: 1, panX: 0, panY: 0 });
+  const smoothViewRef = useRef(false);
+
+  const overlayBuffersRef = useRef<OverlayBuffers | null>(null);
+  const overlayPointsRef = useRef<THREE.Points | null>(null);
+
+  // R3F owns the renderer, scene and camera now — no sceneRef/cameraRef/
+  // rendererRef of our own. `camera` is the same PerspectiveCamera instance
+  // for the life of the Canvas, so closing over it directly (rather than a
+  // ref) is safe.
+  const { camera, gl, size } = useThree();
+
+  /**
+   * Expose the map-view API to the parent. Zoom steps are multiplicative
+   * so each click feels equally weighted regardless of current level.
+   * Reset returns to the exact default flat framing (centered, default Z).
+   */
+  useImperativeHandle(ref, () => ({
+    zoomIn: () => {
+      viewRef.current.zoom = Math.min(ZOOM_MAX, viewRef.current.zoom * 1.25);
+    },
+    zoomOut: () => {
+      viewRef.current.zoom = Math.max(ZOOM_MIN, viewRef.current.zoom / 1.25);
+    },
+    resetView: () => {
+      smoothViewRef.current = true;
+      viewRef.current.zoom = 1;
+      viewRef.current.panX = 0;
+      viewRef.current.panY = 0;
+    },
+  }), []);
+
+  /**
+   * Core frame update function. Reads the STAGES table to know what the
+   * current segment should look like, then blends the two rows it sits
+   * between by `localT`. Every animated quantity — mesh pose, wire
+   * endpoints, wire drawProgress — is a function of the row pair.
+   */
+  const updateGeometry = useCallback((globalStageT: number) => {
+    const meshes = meshesRef.current;
+    const wires = wiresRef.current;
+    if (!meshes.length) return;
+
+    // Row pair for this frame. `segment` is the row we are LEAVING; the
+    // transition is between STAGES[segment] and STAGES[segment + 1].
+    const { segment, localT } = resolveSegment(globalStageT);
+    const rowA = STAGES[segment];
+    const rowB = STAGES[segment + 1];
+
+    // The pair of mesh poses fully determines the algorithm:
+    //   sphere → sphere : hold smooth sphere (static)
+    //   sphere → facet  : lerp smooth → faceted
+    //   facet  → flat   : bezier through the flare control point
+    //   flat   → flat   : hold flat net (static)
+    // Adjacent equal poses mean this segment is a pure wire beat.
+    const meshMotion = `${rowA.mesh}->${rowB.mesh}`;
+    const holdPose = rowA.mesh === rowB.mesh;
+
+    // Wire motion is a single lerp between the two rows' wire poses,
+    // staggered per face. The retract at 3→4 uses the same code path as
+    // the draw-in at 0→1 — they differ only in which row is 'full'.
+    const wireFrom = rowA.wires === 'full' ? 1 : 0;
+    const wireTo = rowB.wires === 'full' ? 1 : 0;
+
+    SPHERE3D.forEach((_, fi: number) => {
+      const faceT = computeFaceT(localT, fi, NUM_FACES, STAGGER_RATIO);
+      // Holding a pose pins et to 1. This is what keeps the wire at its
+      // flat corners during the retract segment (flat→flat) instead of
+      // resetting to the sphere corner on the first frame of that segment.
+      const et = holdPose ? 1 : ease(faceT);
+
+      // Extract raw 3D spherical, flat 2D net, and bezier control points for the 3 face corners
+      const corners = ([0, 1, 2] as const).map((i) => {
+        const sphere = SPHERE[fi][i];
+        const flat = FLAT[fi][i];
+        const cp = vertexControlMap.get(vertexKey(sphere));
+        if (!cp) throw new Error(`Control point not found for face ${fi} vertex ${i}`);
+        return { sphere, flat, cp };
+      });
+
+      // ── UPDATE SUBDIVIDED MESH GEOMETRY ────────────────────────────
+      const posArray = meshes[fi].geometry.attributes.position.array as Float32Array;
+
+      SUB_BARY.forEach(([w0, w1, w2], i) => {
+        // Linear barycentric interpolation across face corner positions
+        const facetPos = new THREE.Vector3(
+          w0 * corners[0].sphere.x + w1 * corners[1].sphere.x + w2 * corners[2].sphere.x,
+          w0 * corners[0].sphere.y + w1 * corners[1].sphere.y + w2 * corners[2].sphere.y,
+          w0 * corners[0].sphere.z + w1 * corners[1].sphere.z + w2 * corners[2].sphere.z,
+        );
+
+        let v: THREE.Vector3;
+        switch (meshMotion) {
+          case 'sphere->sphere':
+            // Static smooth unit sphere.
+            v = facetPos.normalize();
+            break;
+
+          case 'sphere->facet':
+            // Smooth sphere morphs into faceted icosahedron geometry.
+            v = facetPos.clone().normalize().lerp(facetPos, et);
+            break;
+
+          case 'flat->flat':
+            // Static flat net — mesh holds its dymaxion pose.
+            v = new THREE.Vector3(
+              w0 * corners[0].flat.x + w1 * corners[1].flat.x + w2 * corners[2].flat.x,
+              w0 * corners[0].flat.y + w1 * corners[1].flat.y + w2 * corners[2].flat.y,
+              w0 * corners[0].flat.z + w1 * corners[1].flat.z + w2 * corners[2].flat.z,
+            );
+            break;
+
+          default: { // 'facet->flat'
+            // Quadratic Bezier transformation from 3D icosahedron to flat 2D Dymaxion net.
+            const flatPos = new THREE.Vector3(
+              w0 * corners[0].flat.x + w1 * corners[1].flat.x + w2 * corners[2].flat.x,
+              w0 * corners[0].flat.y + w1 * corners[1].flat.y + w2 * corners[2].flat.y,
+              w0 * corners[0].flat.z + w1 * corners[1].flat.z + w2 * corners[2].flat.z,
+            );
+            const cpPos = new THREE.Vector3(
+              w0 * corners[0].cp.x + w1 * corners[1].cp.x + w2 * corners[2].cp.x,
+              w0 * corners[0].cp.y + w1 * corners[1].cp.y + w2 * corners[2].cp.y,
+              w0 * corners[0].cp.z + w1 * corners[1].cp.z + w2 * corners[2].cp.z,
+            );
+            v = bezier3(facetPos, flatPos, cpPos, et);
+            break;
+          }
+        }
+
+        posArray[i * 3] = v.x;
+        posArray[i * 3 + 1] = v.y;
+        posArray[i * 3 + 2] = v.z;
+      });
+
+      meshes[fi].geometry.attributes.position.needsUpdate = true;
+
+      // ── UPDATE WIREFRAME LINE ENDPOINTS ────────────────────────────
+      // Wire corners sit on the smooth sphere while the mesh is still a
+      // sphere (rowA.mesh === 'sphere'). Once the mesh has started its
+      // facet/flat deformation, the wire follows the same bezier path.
+      const wireFollowsMesh = rowA.mesh !== 'sphere';
+      const wPosArray = wires[fi].geometry.attributes.position.array as Float32Array;
+      const currentPts = ([0, 1, 2] as const).map((i) =>
+        wireFollowsMesh
+          ? bezier3(corners[i].sphere, corners[i].flat, corners[i].cp, et)
+          : corners[i].sphere
+      );
+
+      const pairs = [[0, 1], [1, 2], [2, 0]];
+      pairs.forEach(([a, b], idx) => {
+        wPosArray[idx * 6 + 0] = currentPts[a].x;
+        wPosArray[idx * 6 + 1] = currentPts[a].y;
+        wPosArray[idx * 6 + 2] = currentPts[a].z;
+        wPosArray[idx * 6 + 3] = currentPts[b].x;
+        wPosArray[idx * 6 + 4] = currentPts[b].y;
+        wPosArray[idx * 6 + 5] = currentPts[b].z;
+      });
+      wires[fi].geometry.attributes.position.needsUpdate = true;
+
+      // ── UPDATE HAND-DRAWN SHADER UNIFORMS ──────────────────────────
+      // drawProgress is a single lerp between the two rows' wire poses.
+      // Same stagger in both directions, so draw-in and retract feel
+      // like the same hand doing the same stroke.
+      const wireT = ease(computeFaceT(localT, fi, NUM_FACES, WIRE_STAGGER_RATIO));
+      const drawProgress = wireFrom + (wireTo - wireFrom) * wireT;
+
+      const wireMat = wires[fi].material as THREE.ShaderMaterial;
+      wireMat.uniforms.uProgress.value = drawProgress;
+      wires[fi].visible = drawProgress > 0.001;
+    });
+
+    // ── UPDATE DATA OVERLAY POINTS (IF ACTIVE) ──────────────────────
+    const buffers = overlayBuffersRef.current;
+    const points = overlayPointsRef.current;
+    if (buffers && points) {
+      updateOverlayPositions(buffers, globalStageT, STAGGER_RATIO, NUM_FACES);
+      (points.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    }
+  }, []);
+
+  // Native-event version of the old React.MouseEvent handler — the canvas
+  // is now R3F's shared <canvas>, so this binds via addEventListener
+  // instead of a React onDoubleClick prop (see the effect below).
+  const handleDoubleClick = useCallback((e: MouseEvent) => {
+    if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
+    if (animRef.current.drag) return; // ignore if the click was really a drag
+
+    const v = viewRef.current;
+    const cam = camera as THREE.PerspectiveCamera;
+
+    if (v.zoom > 1.001) {
+      smoothViewRef.current = true;
+      v.zoom = 1;
+      v.panX = 0;
+      v.panY = 0;
+      return;
+    }
+
+    smoothViewRef.current = true;
+
+    const zoomOld = v.zoom;
+    const zoomNew = ZOOM_MAX;
+    if (zoomNew === zoomOld) return;
+
+    const rect = gl.domElement.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = 1 - ((e.clientY - rect.top) / rect.height) * 2;
+
+    const tanHalfFov = Math.tan((cam.fov * Math.PI) / 360);
+    const halfH_old = (FLAT_Z / zoomOld) * tanHalfFov;
+    const halfH_new = (FLAT_Z / zoomNew) * tanHalfFov;
+    const halfW_old = halfH_old * cam.aspect;
+    const halfW_new = halfH_new * cam.aspect;
+
+    v.panX += nx * (halfW_new - halfW_old);
+    v.panY += ny * (halfH_new - halfH_old);
+    v.zoom = zoomNew;
+  }, [camera, gl]);
+
+  useEffect(() => {
+    const dom = gl.domElement;
+    const listener = (e: MouseEvent) => handleDoubleClick(e);
+    dom.addEventListener('dblclick', listener);
+    return () => dom.removeEventListener('dblclick', listener);
+  }, [gl, handleDoubleClick]);
+
+  // Cursor affordance the raw-Three version set as inline canvas style.
+  // The canvas is shared site-wide now, so it's set imperatively once
+  // rather than via a per-component style prop.
+  useEffect(() => {
+    gl.domElement.style.cursor = 'grab';
+  }, [gl]);
+
+  // Stable target object for useGesture so it doesn't rebind every render —
+  // gl (and therefore gl.domElement) doesn't change for the Canvas's lifetime.
+  const gestureTarget = useMemo(() => ({ current: gl.domElement }), [gl]);
+
+  // Unified drag/pinch/wheel input. Previously bound to canvasRef; now
+  // bound to gl.domElement, R3F's shared canvas — same target concept,
+  // just sourced from useThree() instead of an owned ref.
+  useGesture(
+    {
+      // Sphere mode: drag rotates. Flat mode: drag pans. Pointer Events
+      // under the hood, so this also covers single-finger touch drag.
+      onDrag: ({ first, last, delta: [dx, dy] }) => {
+        if (first) {
+          smoothViewRef.current = false;
+          animRef.current.drag = false;
+        }
+
+        // Mirrors the old per-event 3px jitter filter: once one move
+        // exceeds it, the rest of the gesture counts as a drag.
+        if (!animRef.current.drag && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+          animRef.current.drag = true;
+        }
+
+        if (animRef.current.drag) {
+          const isFlat = animRef.current.t >= GLOBE_STAGES.DYMAXION;
+          if (isFlat) {
+            const z = camera.position.z;
+            const scale = 0.005 * (z / FLAT_Z);
+            viewRef.current.panX += dx * scale;
+            viewRef.current.panY -= dy * scale;
+          } else if (groupRef.current) {
+            groupRef.current.rotation.y += dx * 0.007;
+            groupRef.current.rotation.x += dy * 0.007;
+          }
+        }
+
+        if (last) animRef.current.drag = false;
+      },
+
+      // Flat-map-only pinch zoom (touch, or ctrl+wheel on trackpad).
+      // `from` seeds the offset at the current zoom, so offset[0] IS the
+      // zoom value directly; scaleBounds does the clamping ZOOM_MIN/MAX
+      // did manually before.
+      onPinch: ({ first, offset: [d] }) => {
+        if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
+        if (first) smoothViewRef.current = false;
+        viewRef.current.zoom = d;
+      },
+
+      // Flat-map-only wheel zoom. Falls through below DYMAXION so page
+      // scroll / Lenis is never hijacked by the sphere stages — same gate
+      // as before.
+      onWheel: ({ event }) => {
+        if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
+        smoothViewRef.current = false;
+        event.preventDefault();
+
+        const cam = camera as THREE.PerspectiveCamera;
+        const canvas = gl.domElement;
+
+        const v = viewRef.current;
+        const zoomOld = v.zoom;
+        const factor = Math.exp(-event.deltaY * 0.0015);
+        const zoomNew = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomOld * factor));
+        if (zoomNew === zoomOld) return;
+
+        if (ZOOM_TO_CURSOR) {
+          const rect = canvas.getBoundingClientRect();
+          const nx = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+          const ny = 1 - ((event.clientY - rect.top) / rect.height) * 2;
+
+          const tanHalfFov = Math.tan((cam.fov * Math.PI) / 360);
+          const halfH_old = (FLAT_Z / zoomOld) * tanHalfFov;
+          const halfH_new = (FLAT_Z / zoomNew) * tanHalfFov;
+          const halfW_old = halfH_old * cam.aspect;
+          const halfW_new = halfH_new * cam.aspect;
+
+          v.panX += nx * (halfW_new - halfW_old);
+          v.panY += ny * (halfH_new - halfH_old);
+        }
+
+        v.zoom = zoomNew;
+      },
+    },
+    {
+      target: gestureTarget,
+      pinch: {
+        scaleBounds: { min: ZOOM_MIN, max: ZOOM_MAX },
+        from: () => [viewRef.current.zoom, 0],
+        rubberband: true,
+      },
+      wheel: {
+        eventOptions: { passive: false },
+      },
+    }
+  );
+
+  // Aspect ratio updates. R3F already keeps a default (non-`manual`)
+  // camera's aspect in sync with the canvas size on its own, but this is
+  // kept as an explicit, idempotent belt-and-suspenders subscription per
+  // the port spec §6 — harmless either way.
+  useEffect(() => {
+    const cam = camera as THREE.PerspectiveCamera;
+    cam.aspect = size.width / size.height;
+    cam.updateProjectionMatrix();
+  }, [size, camera]);
+
+  // Build the 20 face meshes + 20 wireframe LineSegments once, attaching
+  // them directly onto the <group> via groupRef.current.add(...) — the
+  // exact same imperative pattern the raw-Three version used on its own
+  // scene graph. Renderer/scene/camera construction is gone (R3F owns
+  // those); everything else here is unchanged.
+  useEffect(() => {
+    const grp = groupRef.current;
+    if (!grp) return;
+
+    const faceMaterials = createFaceMaterials(baseLayer);
+    const meshes: THREE.Mesh[] = [];
+    const wires: THREE.LineSegments[] = [];
+
+    // Construct 20 icosahedron face meshes & corresponding wireframe overlays
+    SPHERE3D.forEach((_, fi: number) => {
+      // 1. Solid face mesh
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SUB_BARY.length * 3), 3));
+      applyFaceSphereAttribute(geo, fi);
+      const mesh = new THREE.Mesh(geo, faceMaterials[fi]);
+      mesh.renderOrder = 0;
+      mesh.frustumCulled = false;
+      grp.add(mesh);
+      meshes.push(mesh);
+
+      // 2. Wireframe line geometry (6 non-indexed vertices per triangle)
+      const wg = new THREE.BufferGeometry();
+      wg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(18), 3));
+      // Attribute mapping line start (0.0) -> line end (1.0) for every segment
+      wg.setAttribute('lineProgress', new THREE.BufferAttribute(new Float32Array([0, 1, 0, 1, 0, 1]), 1));
+
+      const wireMaterial = new THREE.ShaderMaterial({
+        vertexShader: WIRE_VERTEX_SHADER,
+        fragmentShader: WIRE_FRAGMENT_SHADER,
+        uniforms: {
+          uProgress: { value: 0 },
+          uMaxOpacity: { value: WIRE_MAX_OPACITY },
+          uColor: { value: new THREE.Color(0xffffff) },
+        },
+        transparent: true,
+        depthTest: false,
+      });
+
+      const wire = new THREE.LineSegments(wg, wireMaterial);
+      wire.visible = false;
+      wire.frustumCulled = false;
+      grp.add(wire);
+      wires.push(wire);
+    });
+
+    meshesRef.current = meshes;
+    wiresRef.current = wires;
+
+    updateGeometry(animRef.current.tgt);
+
+    // Teardown WebGL memory references on unmount. No renderer.dispose() /
+    // scene.clear() here — R3F owns and disposes the renderer with the
+    // Canvas itself; this component only owns the geometries/materials it
+    // created.
+    return () => {
+      overlayPointsRef.current?.geometry.dispose();
+      (overlayPointsRef.current?.material as THREE.Material | undefined)?.dispose();
+      meshesRef.current.forEach((m) => {
+        m.geometry.dispose();
+        (m.material as THREE.Material).dispose();
+      });
+      wiresRef.current.forEach((w) => {
+        w.geometry.dispose();
+        (w.material as THREE.Material).dispose();
+      });
+    };
+  }, [updateGeometry]);
+
+  // Hot-swap face materials when baseLayer configuration changes
+  useEffect(() => {
+    if (!meshesRef.current.length) return;
+    const newMaterials = createFaceMaterials(baseLayer);
+    meshesRef.current.forEach((mesh, fi) => {
+      (mesh.material as THREE.Material).dispose();
+      mesh.material = newMaterials[fi];
+    });
+  }, [baseLayer]);
+
+  // Rebuild point overlay buffers when overlay samples are updated
+  useEffect(() => {
+    const grp = groupRef.current;
+    if (!grp) return;
+
+    if (overlayPointsRef.current) {
+      grp.remove(overlayPointsRef.current);
+      overlayPointsRef.current.geometry.dispose();
+      (overlayPointsRef.current.material as THREE.Material).dispose();
+      overlayPointsRef.current = null;
+      overlayBuffersRef.current = null;
+    }
+
+    if (overlaySamples && overlaySamples.length > 0) {
+      const buffers = buildOverlayBuffers(overlaySamples);
+      updateOverlayPositions(buffers, animRef.current.t, STAGGER_RATIO, NUM_FACES);
+      const points = createOverlayPoints(buffers, {
+        color: overlayColor,
+        size: overlaySize,
+        opacity: overlayOpacity,
+      });
+      points.frustumCulled = false;
+      points.visible = showOverlay;
+      grp.add(points);
+      overlayBuffersRef.current = buffers;
+      overlayPointsRef.current = points;
+    }
+  }, [overlaySamples]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Direct toggle for overlay visibility without triggering re-initialization
+  useEffect(() => {
+    if (overlayPointsRef.current) overlayPointsRef.current.visible = showOverlay;
+  }, [showOverlay]);
+
+  // Main render loop handling interpolation and idle rotation. This is the
+  // raw-Three `loop()` function's body moved into useFrame verbatim, minus
+  // the manual requestAnimationFrame scheduling and the final
+  // renderer.render(...) call — R3F calls this every frame and renders
+  // automatically afterward.
+  useFrame(() => {
+    const { t, tgt, drag } = animRef.current;
+
+    // Smooth step towards target stage position
+    if (Math.abs(t - tgt) > 0.0005) {
+      const newT = t + (tgt > t ? PLAYHEAD_RATE : -PLAYHEAD_RATE);
+      animRef.current.t = Math.max(0, Math.min(SEGMENT_COUNT, newT));
+    } else if (t !== tgt) {
+      animRef.current.t = tgt;
+    }
+
+    updateGeometry(animRef.current.t);
+
+    const isFlat = animRef.current.t >= GLOBE_STAGES.DYMAXION;
+
+    // Clamp pan so the map can't be dragged past its own edges.
+    // Limit grows with zoom: at zoom=1 (whole net visible) it's ~0.
+    const zoom = isFlat ? viewRef.current.zoom : 1;
+    const LEEWAY_X = 1;
+    const LEEWAY_Y = 1.618;
+    const limitX = FLAT_BOUNDS.hx * (LEEWAY_X + (1 - 1 / zoom));
+    const limitY = FLAT_BOUNDS.hy * (LEEWAY_Y + (1 - 1 / zoom));
+    viewRef.current.panX = Math.max(-limitX, Math.min(limitX, viewRef.current.panX));
+    viewRef.current.panY = Math.max(-limitY, Math.min(limitY, viewRef.current.panY));
+
+    // Pan: ease group position toward the stored pan offset. Outside
+    // flat mode, pan eases back to zero so the sphere is always centered.
+    if (groupRef.current) {
+      const targetPanX = isFlat ? viewRef.current.panX : 0;
+      const targetPanY = isFlat ? viewRef.current.panY : 0;
+      // Only use the slow ease when resetting. Otherwise, use the snappy ease.
+      const panEase = smoothViewRef.current ? RESET_EASE : PAN_EASE;
+      groupRef.current.position.x += (targetPanX - groupRef.current.position.x) * panEase;
+      groupRef.current.position.y += (targetPanY - groupRef.current.position.y) * panEase;
+    }
+
+    // Automated camera/group orientation behavior
+    if (!drag && groupRef.current) {
+      if (animRef.current.tgt === GLOBE_STAGES.SPHERE && animRef.current.t < 0.05) {
+        // Slow continuous rotation on default sphere view
+        groupRef.current.rotation.y += 0.004;
+      } else if (animRef.current.tgt >= GLOBE_STAGES.DYMAXION) {
+        // Damped realignment to face flat net towards camera when fully unfolded.
+        // Holds through stage 4 as well, so the flat net stays square-on while wires retract.
+        const progress = animRef.current.t / SEGMENT_COUNT;
+        const damping = 0.02 + progress * 0.06;
+        groupRef.current.rotation.x += (-0 - groupRef.current.rotation.x) * damping;
+        groupRef.current.rotation.y += (0 - groupRef.current.rotation.y) * damping;
+      }
+    }
+
+    const cam = camera as THREE.PerspectiveCamera;
+    const SPAN = GLOBE_STAGES.DYMAXION - GLOBE_STAGES.ICOSAHEDRON;
+    const foldProgress = Math.min(1, Math.max(0,
+      (animRef.current.t - GLOBE_STAGES.ICOSAHEDRON) / SPAN));
+    const baseZ = SPHERE_Z + (FLAT_Z - SPHERE_Z) * foldProgress;
+    // User zoom is applied as a divisor on the fold-driven base Z.
+    // Ignored outside flat mode, so the fold's own camera move is untouched.
+    const targetZ = baseZ / zoom;
+    const camEase = smoothViewRef.current ? RESET_EASE : CAMERA_EASE;
+    cam.position.z += (targetZ - cam.position.z) * camEase;
+
+    // Turn off the slow reset ease once everything has settled.
+    const panSettled =
+      Math.abs((groupRef.current?.position.x ?? 0) - (isFlat ? viewRef.current.panX : 0)) < 0.001 &&
+      Math.abs((groupRef.current?.position.y ?? 0) - (isFlat ? viewRef.current.panY : 0)) < 0.001;
+    const camSettled = Math.abs(targetZ - cam.position.z) < 0.001;
+
+    if (smoothViewRef.current && panSettled && camSettled) {
+      smoothViewRef.current = false;
+    }
+  });
+
+  // Synchronize target stage from props
+  useEffect(() => {
+    animRef.current.tgt = stage;
+    // Folding away from the map resets the view so the sphere is never
+    // left off-center or over-zoomed when the animation returns to it.
+    if (stage < GLOBE_STAGES.DYMAXION) {
+      viewRef.current.zoom = 1;
+      viewRef.current.panX = 0;
+      viewRef.current.panY = 0;
+    }
+    onStageChange?.(stage);
+  }, [stage, onStageChange]);
+
+  // The <group> IS the scene node the raw-Three version built by hand
+  // (`new THREE.Group(); scene.add(grp)`). Its children (meshes, wires,
+  // overlay points) are attached imperatively by the effects above, not
+  // declared as JSX — matching the original's construction pattern
+  // exactly rather than re-expressing it declaratively (see the chat
+  // reply for why this reading was chosen over the spec's alternate
+  // <primitive>-children phrasing).
+  return <group ref={groupRef} />;
+});
+
+GlobeR3F.displayName = 'GlobeR3F';
+
+export default GlobeR3F;

@@ -1,122 +1,36 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
-import IcosahedronGlobe, { type GlobeControls } from "./icosahedron-globe";
+import type { RefObject } from "react";
+import type { GlobeControls } from "../scene/GlobeR3F";
 import { GLOBE_STAGES } from "@/utils/icosahedron-geometry";
-import { loadRaster } from "@/utils/raster-engine";
-import { collectRasterSamples, OverlaySample } from "@/utils/overlay-layer";
+import { LAYERS, type LayerId } from "./use-dymaxion-state";
 
-type LayerId = "population" | "blackmarble";
-
-interface LayerDef {
-  id: LayerId;
-  label: string;
-  url: string;
-  color: string;
-  size: number;
-  opacity: number;
-  threshold: number;
-  maxSamples?: number;
-  stride?: number;
+interface DymaxionBaseProps {
+  stage: number;
+  setStage: (stage: number) => void;
+  activeLayerId: LayerId | null;
+  setActiveLayerId: (id: LayerId | null) => void;
+  loading: boolean;
+  /** GlobeControls ref, owned by the page (via useDymaxionState) and
+   *  forwarded into GeoscopeScene — the zoom/reset buttons below just
+   *  read it directly, same as the original imperative-handle pattern. */
+  globeRef: RefObject<GlobeControls | null>;
 }
 
-const LAYERS: LayerDef[] = [
-  {
-    id: "population",
-    label: "Population Density (2024)",
-    url: "/population_2024_1440x720_cog.tif",
-    color: "#ff3b3b",
-    size: 0.012,
-    opacity: 0.35,
-    threshold: 0,
-  },
-  {
-    id: "blackmarble",
-    label: "Black Marble (2016)",
-    url: "/BlackMarble_2016_3km_gray_geo.tif",
-    color: "#ffd97a",
-    size: 0.006,
-    opacity: 0.5,
-    threshold: 40,
-    maxSamples: 200_000,
-    stride: 2,
-  },
-];
-
-export default function DymaxionBase() {
-  const [activeLayerId, setActiveLayerId] = useState<LayerId | null>(null);
-  const [samples, setSamples] = useState<OverlaySample[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [earthTexture, setEarthTexture] = useState<THREE.Texture | null>(null);
-  const [stage, setStage] = useState<number>(GLOBE_STAGES.SPHERE);
-
-  const samplesCacheRef = useRef<Map<LayerId, OverlaySample[]>>(new Map());
-
-  /**
-   * Imperative handle to the globe's map-view API. Zoom and reset are
-   * commands, not state — they bypass React's render cycle on purpose,
-   * so a wheel-scroll or button-mash never re-renders the whole tree.
-   */
-  const globeRef = useRef<GlobeControls>(null);
-
-  // Load Earth texture
-  useEffect(() => {
-    const loader = new THREE.TextureLoader();
-    const tex = loader.load("/earth_day.jpg");
-    tex.wrapS = THREE.ClampToEdgeWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.minFilter = THREE.LinearMipmapLinearFilter;
-    tex.generateMipmaps = true;
-    tex.needsUpdate = true;
-    setEarthTexture(tex);
-  }, []);
-
-  // Load / switch active raster layer
-  useEffect(() => {
-    if (!activeLayerId) {
-      setSamples([]);
-      return;
-    }
-
-    const cached = samplesCacheRef.current.get(activeLayerId);
-    if (cached) {
-      setSamples(cached);
-      return;
-    }
-
-    const layer = LAYERS.find((l) => l.id === activeLayerId)!;
-    let cancelled = false;
-    setLoading(true);
-
-    (async () => {
-      const ok = await loadRaster(layer.id, layer.url);
-      if (!ok || cancelled) {
-        setLoading(false);
-        return;
-      }
-      const collected = collectRasterSamples({
-        rasterId: layer.id,
-        threshold: layer.threshold,
-        maxSamples: layer.maxSamples,
-        stride: layer.stride,
-      });
-      samplesCacheRef.current.set(layer.id, collected);
-      if (!cancelled) {
-        setSamples(collected);
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeLayerId]);
-
-  const activeLayer = activeLayerId
-    ? LAYERS.find((l) => l.id === activeLayerId)
-    : null;
-
+/**
+ * Pure HTML overlay: the Unfold/Fold button, map zoom controls, and the
+ * overlay radio panel. No canvas, no Three.js — the globe itself now
+ * renders in GeoscopeScene, the fixed full-screen background canvas that
+ * sits behind this component (port spec §3, "HTML UI Layer").
+ */
+export default function DymaxionBase({
+  stage,
+  setStage,
+  activeLayerId,
+  setActiveLayerId,
+  loading,
+  globeRef,
+}: DymaxionBaseProps) {
   const atFlat = stage >= GLOBE_STAGES.DYMAXION;
   const isUnfolded = stage >= GLOBE_STAGES.WIRES_GONE;
 
@@ -124,8 +38,6 @@ export default function DymaxionBase() {
     <div className="w-full flex flex-col items-center pointer-events-auto select-none">
       {/* Header Bar */}
       <div className="w-full mb-3 md:mb-4 flex items-center justify-between shrink-0">
-        {/* <h1 className="title-section">Dymaxion Projection</h1> */}
-
         {/* 
             INTENTIONALITY: Equalized button geometry (`w-36 h-9`) matching design tokens.
             No borders; surface elevation distinguish state changes cleanly without jumps.
@@ -159,41 +71,20 @@ export default function DymaxionBase() {
       */}
       <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         
-        {/* Canvas & Timeline Track */}
+        {/* Layout spacer & Timeline Track */}
         <div className="lg:col-span-2 w-full flex flex-col gap-3">
+          {/* 
+              The globe itself now lives in GeoscopeScene, the fixed
+              full-screen background canvas — it is no longer embedded here.
+              This div is kept only as a layout spacer so the controls and
+              timeline track below don't reflow to fill the space the
+              embedded canvas used to occupy. It renders nothing and
+              intercepts no pointer events.
+          */}
           <div
-            className="w-full aspect-[2/1] max-h-[420px] relative overflow-hidden flex items-center justify-center"
-            style={{
-              background: "var(--color-surface-elevated)",
-              boxShadow: "var(--color-shadow)",
-            }}
-          >
-            {earthTexture ? (
-              <IcosahedronGlobe
-                ref={globeRef}
-                stage={stage}
-                onStageChange={setStage}
-                overlaySamples={samples}
-                showOverlay={activeLayerId !== null}
-                overlayColor={activeLayer?.color}
-                overlaySize={activeLayer?.size}
-                overlayOpacity={activeLayer?.opacity}
-                baseLayer={{ mode: "texture", texture: earthTexture }}
-              />
-            ) : (
-              <IcosahedronGlobe
-                ref={globeRef}
-                stage={stage}
-                onStageChange={setStage}
-                overlaySamples={samples}
-                showOverlay={activeLayerId !== null}
-                overlayColor={activeLayer?.color}
-                overlaySize={activeLayer?.size}
-                overlayOpacity={activeLayer?.opacity}
-                baseLayer={{ mode: "debug" }}
-              />
-            )}
-          </div>
+            className="w-full aspect-[2/1] max-h-[420px] pointer-events-none"
+            aria-hidden="true"
+          />
 
           {/* 
               INTENTIONALITY: Map controls fade in only once the fold has settled flat.

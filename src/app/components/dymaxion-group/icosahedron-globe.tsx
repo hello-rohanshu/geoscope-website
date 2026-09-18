@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
+import { useGesture } from '@use-gesture/react';
 import {
   SPHERE3D, SPHERE, FLAT, ease, bezier3, vertexKey, vertexControlMap, computeFaceT, NUM_FACES, SUB_BARY,
   GLOBE_STAGES, SEGMENT_COUNT, resolveSegment, STAGES,
@@ -130,8 +131,6 @@ interface AnimState {
   tgt: number;
   /** Whether the user is actively dragging to rotate the globe. */
   drag: boolean;
-  /** Previous mouse position recorded during drag. */
-  lastMouse: { x: number; y: number } | null;
   /** Current requestAnimationFrame tick handle for cleanup. */
   frameId: number;
 }
@@ -192,7 +191,6 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
     t: stage,
     tgt: stage,
     drag: false,
-    lastMouse: null,
     frameId: 0,
   });
 
@@ -379,6 +377,138 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
     }
   }, []);
 
+  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
+    if (animRef.current.drag) return; // ignore if the click was really a drag
+
+    const v = viewRef.current;
+    const cam = cameraRef.current;
+    if (!cam) return;
+
+    if (v.zoom > 1.001) {
+      smoothViewRef.current = true;
+      v.zoom = 1;
+      v.panX = 0;
+      v.panY = 0;
+      return;
+    }
+
+    smoothViewRef.current = true;
+
+    const zoomOld = v.zoom;
+    const zoomNew = ZOOM_MAX;
+    if (zoomNew === zoomOld) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = 1 - ((e.clientY - rect.top) / rect.height) * 2;
+
+    const tanHalfFov = Math.tan((cam.fov * Math.PI) / 360);
+    const halfH_old = (FLAT_Z / zoomOld) * tanHalfFov;
+    const halfH_new = (FLAT_Z / zoomNew) * tanHalfFov;
+    const halfW_old = halfH_old * cam.aspect;
+    const halfW_new = halfH_new * cam.aspect;
+
+    v.panX += nx * (halfW_new - halfW_old);
+    v.panY += ny * (halfH_new - halfH_old);
+    v.zoom = zoomNew;
+  }, []);
+
+  // Unified drag/pinch/wheel input. Bound to canvasRef via `target` (real
+  // native listeners, non-passive on wheel) rather than spread as React
+  // props — see notes above the diff for why.
+  useGesture(
+    {
+      // Sphere mode: drag rotates. Flat mode: drag pans. Pointer Events
+      // under the hood, so this also covers single-finger touch drag —
+      // previously absent entirely.
+      onDrag: ({ first, last, delta: [dx, dy] }) => {
+        if (first) {
+          smoothViewRef.current = false;
+          animRef.current.drag = false;
+        }
+
+        // Mirrors the old per-event 3px jitter filter: once one move
+        // exceeds it, the rest of the gesture counts as a drag.
+        if (!animRef.current.drag && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+          animRef.current.drag = true;
+        }
+
+        if (animRef.current.drag) {
+          const isFlat = animRef.current.t >= GLOBE_STAGES.DYMAXION;
+          if (isFlat) {
+            const z = cameraRef.current?.position.z ?? FLAT_Z;
+            const scale = 0.005 * (z / FLAT_Z);
+            viewRef.current.panX += dx * scale;
+            viewRef.current.panY -= dy * scale;
+          } else if (groupRef.current) {
+            groupRef.current.rotation.y += dx * 0.007;
+            groupRef.current.rotation.x += dy * 0.007;
+          }
+        }
+
+        if (last) animRef.current.drag = false;
+      },
+
+      // Flat-map-only pinch zoom (touch, or ctrl+wheel on trackpad).
+      // `from` seeds the offset at the current zoom, so offset[0] IS the
+      // zoom value directly; scaleBounds does the clamping ZOOM_MIN/MAX
+      // did manually before.
+      onPinch: ({ first, offset: [d] }) => {
+        if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
+        if (first) smoothViewRef.current = false;
+        viewRef.current.zoom = d;
+      },
+
+      // Flat-map-only wheel zoom. Falls through below DYMAXION so page
+      // scroll / Lenis is never hijacked by the sphere stages — same gate
+      // as before.
+      onWheel: ({ event }) => {
+        if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
+        smoothViewRef.current = false;
+        event.preventDefault();
+
+        const cam = cameraRef.current;
+        const canvas = canvasRef.current;
+        if (!cam || !canvas) return;
+
+        const v = viewRef.current;
+        const zoomOld = v.zoom;
+        const factor = Math.exp(-event.deltaY * 0.0015);
+        const zoomNew = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomOld * factor));
+        if (zoomNew === zoomOld) return;
+
+        if (ZOOM_TO_CURSOR) {
+          const rect = canvas.getBoundingClientRect();
+          const nx = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+          const ny = 1 - ((event.clientY - rect.top) / rect.height) * 2;
+
+          const tanHalfFov = Math.tan((cam.fov * Math.PI) / 360);
+          const halfH_old = (FLAT_Z / zoomOld) * tanHalfFov;
+          const halfH_new = (FLAT_Z / zoomNew) * tanHalfFov;
+          const halfW_old = halfH_old * cam.aspect;
+          const halfW_new = halfH_new * cam.aspect;
+
+          v.panX += nx * (halfW_new - halfW_old);
+          v.panY += ny * (halfH_new - halfH_old);
+        }
+
+        v.zoom = zoomNew;
+      },
+    },
+    {
+      target: canvasRef,
+      pinch: {
+        scaleBounds: { min: ZOOM_MIN, max: ZOOM_MAX },
+        from: () => [viewRef.current.zoom, 0],
+        rubberband: true,
+      },
+      wheel: {
+        eventOptions: { passive: false },
+      },
+    }
+  );
+
   // Responsive resize handler listening to parent container dimensions
   useEffect(() => {
     const container = containerRef.current;
@@ -476,135 +606,9 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
 
     updateGeometry(animRef.current.tgt);
 
-    // Mouse drag: rotate the globe in sphere mode, pan the map in flat mode.
-    const onMouseDown = (e: MouseEvent) => {
-      animRef.current.lastMouse = { x: e.clientX, y: e.clientY };
-      animRef.current.drag = false;
-      smoothViewRef.current = false;   // user takes over; cancel the reset glide
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      const { lastMouse } = animRef.current;
-      if (!lastMouse || !groupRef.current) return;
-      const dx = e.clientX - lastMouse.x;
-      const dy = e.clientY - lastMouse.y;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) animRef.current.drag = true;
-      if (!animRef.current.drag) return;
-
-      // Flat map mode: drag slides the map. Spherical modes: drag rotates.
-      const isFlat = animRef.current.t >= GLOBE_STAGES.DYMAXION;
-      if (isFlat) {
-        // Screen pixels -> world units, scaled by current camera distance
-        // so panning feels consistent at any zoom level.
-        const z = cameraRef.current?.position.z ?? FLAT_Z;
-        const scale = 0.005 * (z / FLAT_Z);
-        viewRef.current.panX += dx * scale;
-        viewRef.current.panY -= dy * scale;
-      } else {
-        groupRef.current.rotation.y += dx * 0.007;
-        groupRef.current.rotation.x += dy * 0.007;
-      }
-      animRef.current.lastMouse = { x: e.clientX, y: e.clientY };
-    };
-
-    const onMouseUp = () => {
-      // Click-to-toggle stays disabled — stage is fully controlled by the
-      // parent via the `stage` prop (see the `useEffect` below).
-      animRef.current.lastMouse = null;
-      animRef.current.drag = false;
-    };
-
-    // Wheel zoom: only in flat map mode. Before DYMAXION the event falls
-    // through so page scroll is never hijacked by the sphere stages.
-    const onWheel = (e: WheelEvent) => {
-      if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
-      smoothViewRef.current = false;   // user takes over; cancel the reset glide
-      e.preventDefault();
-
-      const cam = cameraRef.current;
-      if (!cam) return;
-
-      const v = viewRef.current;
-      const zoomOld = v.zoom;
-      const factor = Math.exp(-e.deltaY * 0.0015);
-      const zoomNew = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomOld * factor));
-      if (zoomNew === zoomOld) return;
-
-      if (ZOOM_TO_CURSOR) {
-        // Cursor position in [-1, 1], Y up. Center of canvas is (0, 0).
-        const rect = canvas.getBoundingClientRect();
-        const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        const ny = 1 - ((e.clientY - rect.top) / rect.height) * 2;
-
-        // World half-extents of the visible frustum at old vs new zoom.
-        const tanHalfFov = Math.tan((cam.fov * Math.PI) / 360);
-        const halfH_old = (FLAT_Z / zoomOld) * tanHalfFov;
-        const halfH_new = (FLAT_Z / zoomNew) * tanHalfFov;
-        const halfW_old = halfH_old * cam.aspect;
-        const halfW_new = halfH_new * cam.aspect;
-
-        // Shift pan so the map point under the cursor stays put on screen.
-        v.panX += nx * (halfW_new - halfW_old);
-        v.panY += ny * (halfH_new - halfH_old);
-      }
-
-      v.zoom = zoomNew;
-    };
-
-    const onDoubleClick = (e: MouseEvent) => {
-      if (animRef.current.t < GLOBE_STAGES.DYMAXION) return;
-      if (animRef.current.drag) return;   // ignore if the click was really a drag
-
-      const v = viewRef.current;
-      const cam = cameraRef.current;
-      if (!cam) return;
-
-      // Any zoom beyond origin → reset home.
-      if (v.zoom > 1.001) {
-        smoothViewRef.current = true;
-        v.zoom = 1;
-        v.panX = 0;
-        v.panY = 0;
-        return;
-      }
-
-      // Smooth glide for both pan and camera — same as reset.
-      smoothViewRef.current = true;
-
-      // At origin → zoom all the way in, anchored at the cursor.
-      const zoomOld = v.zoom;
-      const zoomNew = ZOOM_MAX;
-      if (zoomNew === zoomOld) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const ny = 1 - ((e.clientY - rect.top) / rect.height) * 2;
-
-      const tanHalfFov = Math.tan((cam.fov * Math.PI) / 360);
-      const halfH_old = (FLAT_Z / zoomOld) * tanHalfFov;
-      const halfH_new = (FLAT_Z / zoomNew) * tanHalfFov;
-      const halfW_old = halfH_old * cam.aspect;
-      const halfW_new = halfH_new * cam.aspect;
-
-      v.panX += nx * (halfW_new - halfW_old);
-      v.panY += ny * (halfH_new - halfH_old);
-      v.zoom = zoomNew;
-    };
-
-    canvas.addEventListener('mousedown', onMouseDown);
-    canvas.addEventListener('mousemove', onMouseMove);
-    canvas.addEventListener('mouseup', onMouseUp);
-    canvas.addEventListener('wheel', onWheel, { passive: false });
-    canvas.addEventListener('dblclick', onDoubleClick);
-
     // Teardown WebGL memory references on unmount
     return () => {
       cancelAnimationFrame(animRef.current.frameId);
-      canvas.removeEventListener('mousedown', onMouseDown);
-      canvas.removeEventListener('mousemove', onMouseMove);
-      canvas.removeEventListener('mouseup', onMouseUp);
-      canvas.removeEventListener('wheel', onWheel);
-      canvas.removeEventListener('dblclick', onDoubleClick);
       overlayPointsRef.current?.geometry.dispose();
       (overlayPointsRef.current?.material as THREE.Material | undefined)?.dispose();
       meshesRef.current.forEach((m) => {
@@ -759,12 +763,14 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
         style={{
           display: 'block',
           cursor: 'grab',
+          touchAction: 'none',
           background: 'transparent',
           border: '2px solid white',
           width: '100%',
           height: '100%',
           ...style,
         }}
+        onDoubleClick={handleDoubleClick}
         {...canvasProps}
       />
     </div>

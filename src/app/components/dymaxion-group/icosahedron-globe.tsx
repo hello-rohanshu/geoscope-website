@@ -732,6 +732,16 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
         const targetZ = baseZ / zoom;
         const camEase = smoothViewRef.current ? RESET_EASE : CAMERA_EASE;
         cam.position.z += (targetZ - cam.position.z) * camEase;
+
+        // Turn off the slow reset ease once everything has settled.
+        const panSettled =
+          Math.abs((groupRef.current?.position.x ?? 0) - (isFlat ? viewRef.current.panX : 0)) < 0.001 &&
+          Math.abs((groupRef.current?.position.y ?? 0) - (isFlat ? viewRef.current.panY : 0)) < 0.001;
+        const camSettled = Math.abs(targetZ - cam.position.z) < 0.001;
+
+        if (smoothViewRef.current && panSettled && camSettled) {
+          smoothViewRef.current = false;
+        }
       }
 
       rendererRef.current?.render(sceneRef.current!, cameraRef.current!);

@@ -164,6 +164,7 @@ export default function DymaxionBase() {
           <div
             className="w-full aspect-[2/1] max-h-[420px] relative overflow-hidden flex items-center justify-center"
             data-globe-hit
+            data-globe-flat={atFlat ? "" : undefined}
             style={{
               boxShadow: "var(--color-shadow)",
             }}

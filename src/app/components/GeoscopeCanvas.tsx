@@ -58,6 +58,8 @@ function SceneContent() {
     const isInsideGlobe = (x: number, y: number) => {
       const hit = document.querySelector('[data-globe-hit]') as HTMLElement | null;
       if (!hit) return false;
+      // Flat map: stars hold still. Only drag-orbit while it's still a sphere.
+      if (hit.hasAttribute('data-globe-flat')) return false;
       const r = hit.getBoundingClientRect();
       return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
     };
@@ -102,7 +104,7 @@ function SceneContent() {
 
     // Uncomment the `- size.height` to shift the globe one viewport below
     // the top of the page (the original "below the hero" behavior).
-    const scrollOffset = window.scrollY  - size.height;
+    const scrollOffset = window.scrollY - size.height;
 
     perspectiveCam.setViewOffset(
       size.width,

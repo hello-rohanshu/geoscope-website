@@ -9,7 +9,7 @@ import {
   getValueAtIndex,
   getLonLatForIndex,
 } from "@/utils/raster-engine"
-import { useMapProjection } from "../dymaxion-group/[reference]-dymaxion-map-basic";
+import { useMapProjection } from "./[reference]-dymaxion-map-basic";
 
 const RASTER_URL = "/population_2024_1440x720_cog.tif";
 

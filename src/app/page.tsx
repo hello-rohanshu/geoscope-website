@@ -3,12 +3,12 @@
 import { useEffect, ReactNode } from 'react';
 import Lenis from 'lenis';
 import GeoscopeScene from '@/app/components/scene/GeoscopeScene';
-import { useDymaxionState } from '@/app/components/dymaxion-group/use-dymaxion-state';
+import { useDymaxionState } from '@/app/components/dymaxion/use-dymaxion-state';
 import HumanityTimeline from '@/app/components/timeline/humanity-timeline';
 import GeoscopeTitleCard from '@/app/components/title-card';
 import DomainPanels from '@/app/components/domain-panels';
 import DesignScienceProgress from '@/app/components/design-science-progress';
-import DymaxionBase from '@/app/components/dymaxion-group/dymaxion-base';
+import DymaxionBase from '@/app/components/dymaxion/dymaxion-base';
 
 // Reusable full-screen layout wrapper providing site-wide boundary/padding
 function Section({
@@ -20,7 +20,7 @@ function Section({
 }) {
   return (
     <section
-      className={`relative z-10 flex min-h-[100svh] w-full items-center justify-center px-10 sm:px-12 md:px-16 lg:px-24 py-8 border-4 border-white ${className}`}
+      className={`relative z-10 pointer-events-none flex min-h-[100svh] w-full items-center justify-center px-10 sm:px-12 md:px-16 lg:px-24 py-8 border-4 border-white ${className}`}
     >
       <div className="w-full max-w-7xl flex items-center justify-center z-20">
         {children}

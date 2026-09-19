@@ -430,7 +430,7 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
 
         // Mirrors the old per-event 3px jitter filter: once one move
         // exceeds it, the rest of the gesture counts as a drag.
-        if (!animRef.current.drag && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+        if (!animRef.current.drag && (Math.abs(dx) > 0 || Math.abs(dy) > 0)) {
           animRef.current.drag = true;
         }
 
@@ -442,8 +442,8 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
             viewRef.current.panX += dx * scale;
             viewRef.current.panY -= dy * scale;
           } else if (groupRef.current) {
-            groupRef.current.rotation.y += dx * 0.007;
-            groupRef.current.rotation.x += dy * 0.007;
+            groupRef.current.rotation.y += dx * 0.005;
+            groupRef.current.rotation.x += dy * 0.005;
           }
         }
 

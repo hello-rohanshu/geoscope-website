@@ -708,10 +708,7 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
 
       // Automated camera/group orientation behavior
       if (!drag && groupRef.current) {
-        if (animRef.current.tgt === GLOBE_STAGES.SPHERE && animRef.current.t < 0.05) {
-          // Slow continuous rotation on default sphere view
-          groupRef.current.rotation.y += 0.004;
-        } else if (animRef.current.tgt >= GLOBE_STAGES.DYMAXION) {
+        if (animRef.current.tgt >= GLOBE_STAGES.DYMAXION) {
           // Damped realignment to face flat net towards camera when fully unfolded.
           // Holds through stage 4 as well, so the flat net stays square-on while wires retract.
           const progress = animRef.current.t / SEGMENT_COUNT;

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Stars } from '@react-three/drei';
+import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
 
 // ============================================================
@@ -26,8 +26,9 @@ const STAR_SPEED = 0;         // 0 = static stars (no twinkle animation).
 // SCENE CONTENT
 // ============================================================
 function SceneContent() {
-  const meshRef = useRef<THREE.Mesh>(null!);
-  const { camera, size, raycaster, gl } = useThree();
+  const { camera, size } = useThree();
+  const starsGroupRef = useRef<THREE.Group>(null!);
+  const dragRef = useRef({ active: false, lastX: 0, lastY: 0, rotX: 0, rotY: 0 });
 
   // Precompute layer offsets with jitter so stacked shells don't align into
   // visible "bands" or repeating patterns.
@@ -47,46 +48,61 @@ function SceneContent() {
   }, []);
 
   // ----------------------------------------------------------
-  // ORBIT GATE
-  // Swallow pointerdown unless the ray hits the icosahedron, so the scene
-  // (stars included) stays perfectly still until you grab the shape.
+  // DRAG-ON-GLOBE GATE
+  // The real globe lives in a sibling canvas that sits on top of this one,
+  // so clicks on it never reach us. Listen on window instead, and only
+  // start orbiting the stars when the pointer goes down inside the DOM
+  // rect tagged [data-globe-hit].
   // ----------------------------------------------------------
   useEffect(() => {
-    const domEl = gl.domElement;
-    const ndc = new THREE.Vector2();
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (!meshRef.current) return;
-
-      const rect = domEl.getBoundingClientRect();
-      ndc.set(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1
-      );
-
-      raycaster.setFromCamera(ndc, camera);
-      const hit = raycaster.intersectObject(meshRef.current, false).length > 0;
-
-      if (!hit) e.stopImmediatePropagation();
+    const isInsideGlobe = (x: number, y: number) => {
+      const hit = document.querySelector('[data-globe-hit]') as HTMLElement | null;
+      if (!hit) return false;
+      const r = hit.getBoundingClientRect();
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
     };
 
-    domEl.addEventListener('pointerdown', handlePointerDown, { capture: true });
+    const onDown = (e: PointerEvent) => {
+      if (!isInsideGlobe(e.clientX, e.clientY)) return;
+      dragRef.current.active = true;
+      dragRef.current.lastX = e.clientX;
+      dragRef.current.lastY = e.clientY;
+    };
+
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d.active) return;
+      const dx = e.clientX - d.lastX;
+      const dy = e.clientY - d.lastY;
+      d.lastX = e.clientX;
+      d.lastY = e.clientY;
+      d.rotY += dx * 0.005;
+      d.rotX += dy * 0.005;
+    };
+
+    const onUp = () => { dragRef.current.active = false; };
+
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
     return () => {
-      domEl.removeEventListener('pointerdown', handlePointerDown, {
-        capture: true,
-      });
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
-  }, [camera, gl, raycaster]);
+  }, []);
 
   // ----------------------------------------------------------
-  // SCROLL-DRIVEN VIEW OFFSET
+  // SCROLL-DRIVEN VIEW OFFSET + STAR ROTATION
   // ----------------------------------------------------------
   useFrame(() => {
     const perspectiveCam = camera as THREE.PerspectiveCamera;
 
     // Uncomment the `- size.height` to shift the globe one viewport below
     // the top of the page (the original "below the hero" behavior).
-    const scrollOffset = window.scrollY /* - size.height */;
+    const scrollOffset = window.scrollY  - size.height;
 
     perspectiveCam.setViewOffset(
       size.width,
@@ -96,6 +112,14 @@ function SceneContent() {
       size.width,
       size.height
     );
+
+    if (starsGroupRef.current) {
+      const d = dragRef.current;
+      starsGroupRef.current.rotation.y +=
+        (d.rotY - starsGroupRef.current.rotation.y) * 0.15;
+      starsGroupRef.current.rotation.x +=
+        (d.rotX - starsGroupRef.current.rotation.x) * 0.15;
+    }
   });
 
   useEffect(() => {
@@ -124,62 +148,21 @@ function SceneContent() {
           - fade:      soften star edges for a more organic look.
           - speed:     0 = static, >0 = twinkle animation.
           ======================================================== */}
-      {layerOffsets.map((pos, i) => (
-        <group key={i} position={pos}>
-          <Stars
-            radius={STAR_RADIUS}
-            depth={STAR_DEPTH}
-            count={STARS_PER_LAYER}
-            factor={STAR_FACTOR}
-            saturation={STAR_SATURATION}
-            fade
-            speed={STAR_SPEED}
-          />
-        </group>
-      ))}
-
-      {/* ========================================================
-          ICOSAHEDRON (the "globe")
-          ======================================================== */}
-      <mesh ref={meshRef} position={[0, 0, 0]}>
-        <icosahedronGeometry args={[2, 0]} />
-        <meshStandardMaterial color="#3b82f6" flatShading />
-      </mesh>
-
-      {/* ========================================================
-          ORBIT CONTROLS
-          - enableDamping:   smooth inertia when you release the drag.
-          - dampingFactor:   how quickly the inertia decays (lower = snappier).
-          - enableZoom:      false = lock camera distance.
-          - enablePan:       false = lock camera translation.
-          - enableRotate:    true = allow orbiting via drag.
-          - rotateSpeed:     multiplier on rotation sensitivity.
-          - makeDefault:     register as the scene's default controls.
-          - minPolarAngle:   vertical orbit lower limit (radians).
-          - maxPolarAngle:   vertical orbit upper limit (radians).
-          - minDistance:     closest zoom distance (orthographic only).
-          - maxDistance:     farthest zoom distance (orthographic only).
-          - autoRotate:      idle spin. Set true for a slow showcase orbit.
-          - autoRotateSpeed: multiplier on autoRotate speed.
-          - regress:         lower render quality during interaction (perf).
-          - keyEvents:       enable keyboard arrow-key navigation.
-          ======================================================== */}
-      <OrbitControls
-        makeDefault
-        enableZoom={false}
-        enablePan={false}
-        enableDamping={true}
-        dampingFactor={0.05}
-      // rotateSpeed={1.0}
-      // minPolarAngle={0}
-      // maxPolarAngle={Math.PI}
-      // minDistance={2}
-      // maxDistance={10}
-      // autoRotate={false}
-      // autoRotateSpeed={2.0}
-      // regress={false}
-      // keyEvents={false}
-      />
+      <group ref={starsGroupRef}>
+        {layerOffsets.map((pos, i) => (
+          <group key={i} position={pos}>
+            <Stars
+              radius={STAR_RADIUS}
+              depth={STAR_DEPTH}
+              count={STARS_PER_LAYER}
+              factor={STAR_FACTOR}
+              saturation={STAR_SATURATION}
+              fade
+              speed={STAR_SPEED}
+            />
+          </group>
+        ))}
+      </group>
     </>
   );
 }

@@ -158,11 +158,12 @@ export default function DymaxionBase() {
           and native shadows to float seamlessly over the site backdrop.
       */}
       <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
+
         {/* Canvas & Timeline Track */}
         <div className="lg:col-span-2 w-full flex flex-col gap-3">
           <div
             className="w-full aspect-[2/1] max-h-[420px] relative overflow-hidden flex items-center justify-center"
+            data-globe-hit
             style={{
               boxShadow: "var(--color-shadow)",
             }}
@@ -202,9 +203,8 @@ export default function DymaxionBase() {
               discipline the `pointer-events-none` class already enforces for mice.
           */}
           <div
-            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${
-              atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
+            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
             aria-hidden={!atFlat}
           >
             <button
@@ -251,9 +251,8 @@ export default function DymaxionBase() {
           </div>
 
           <div
-            className={`w-full h-9 flex items-center justify-center text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${
-              atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
+            className={`w-full h-9 flex items-center justify-center text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
             style={{
               background: "var(--color-progress-track)",
               color: "var(--color-text-muted)",
@@ -265,9 +264,8 @@ export default function DymaxionBase() {
 
         {/* Floating Overlay Controls */}
         <div
-          className={`lg:col-span-1 w-full transition-opacity duration-300 ${
-            atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
+          className={`lg:col-span-1 w-full transition-opacity duration-300 ${atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
         >
           <div
             className="p-5 flex flex-col gap-3"

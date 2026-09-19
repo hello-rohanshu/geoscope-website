@@ -31,7 +31,7 @@ const LAYERS: LayerDef[] = [
     url: "/population_2024_1440x720_cog.tif",
     color: "#ff3b3b",
     size: 0.006,
-    opacity: 0.7,
+    opacity: 0.6,
     threshold: 0,
     // no targetWidth/Height — loads full res, already fast
   },
@@ -41,8 +41,10 @@ const LAYERS: LayerDef[] = [
     url: "/BlackMarble_2016_3km_gray_geo_cog.tif",
     color: "#ffd97a",
     size: 0.006,
-    opacity: 0.7,
-    threshold: 0,
+    opacity: 1,
+    threshold: 20,
+    // maxSamples: 200_000,
+    stride: 2,
     targetWidth: 2700,   // half of 13500, still sharp enough
     targetHeight: 1350,
     resampleMethod: "nearest",

@@ -203,6 +203,10 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
   const viewRef = useRef({ zoom: 1, panX: 0, panY: 0 });
   const smoothViewRef = useRef(false);
 
+  const onStageChangeRef = useRef(onStageChange);
+  useEffect(() => { onStageChangeRef.current = onStageChange; }, [onStageChange]);
+  const lastBoundaryRef = useRef(-1);
+
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -683,6 +687,16 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
 
       updateGeometry(animRef.current.t);
 
+      let boundary = 0;
+      if (t >= GLOBE_STAGES.WIRES_GONE) boundary = 4;
+      else if (t >= GLOBE_STAGES.DYMAXION) boundary = 3;
+      else if (t >= GLOBE_STAGES.ICOSAHEDRON) boundary = 2;
+      else if (t >= GLOBE_STAGES.SPHERE_TRIANGULATED) boundary = 1;
+      if (boundary !== lastBoundaryRef.current) {
+        lastBoundaryRef.current = boundary;
+        onStageChangeRef.current?.(t);
+      }
+
       const isFlat = animRef.current.t >= GLOBE_STAGES.DYMAXION;
 
       // Clamp pan so the map can't be dragged past its own edges.
@@ -759,8 +773,7 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
       viewRef.current.panX = 0;
       viewRef.current.panY = 0;
     }
-    onStageChange?.(stage);
-  }, [stage, onStageChange]);
+  }, [stage]);
 
   return (
     <div ref={containerRef} className="w-full h-full" data-lenis-prevent>

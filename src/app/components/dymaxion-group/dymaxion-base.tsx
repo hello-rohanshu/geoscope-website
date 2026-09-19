@@ -57,6 +57,7 @@ export default function DymaxionBase() {
   const [loading, setLoading] = useState(false);
   const [earthTexture, setEarthTexture] = useState<THREE.Texture | null>(null);
   const [stage, setStage] = useState<number>(GLOBE_STAGES.SPHERE);
+  const [targetStage, setTargetStage] = useState<number>(GLOBE_STAGES.SPHERE);
 
   const samplesCacheRef = useRef<Map<LayerId, OverlaySample[]>>(new Map());
 
@@ -137,7 +138,7 @@ export default function DymaxionBase() {
     : null;
 
   const atFlat = stage >= GLOBE_STAGES.DYMAXION;
-  const isUnfolded = stage >= GLOBE_STAGES.WIRES_GONE;
+  const isUnfolded = stage >= GLOBE_STAGES.DYMAXION;
 
   /**
    * Single-active toggle: checking an unchecked layer activates it; checking
@@ -165,7 +166,7 @@ export default function DymaxionBase() {
         <button
           type="button"
           onClick={() =>
-            setStage(
+            setTargetStage(
               isUnfolded ? GLOBE_STAGES.SPHERE : GLOBE_STAGES.WIRES_GONE
             )
           }
@@ -206,7 +207,7 @@ export default function DymaxionBase() {
             {earthTexture ? (
               <IcosahedronGlobe
                 ref={globeRef}
-                stage={stage}
+                stage={targetStage}
                 onStageChange={setStage}
                 overlaySamples={samples}
                 showOverlay={activeLayerId !== null}
@@ -218,7 +219,7 @@ export default function DymaxionBase() {
             ) : (
               <IcosahedronGlobe
                 ref={globeRef}
-                stage={stage}
+                stage={targetStage}
                 onStageChange={setStage}
                 overlaySamples={samples}
                 showOverlay={activeLayerId !== null}

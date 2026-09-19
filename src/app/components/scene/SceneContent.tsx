@@ -14,7 +14,7 @@ import GlobeR3F, { type GlobeControls, type GlobeR3FProps } from './GlobeR3F';
  * 0.4 reads as parallax: stars lag slightly behind, suggesting distance.
  * Named and pulled out here so it's easy to find and retune (port spec §7).
  */
-const STAR_COUPLING = 0.4;
+const STAR_COUPLING = 1;
 
 export type SceneContentProps = Omit<GlobeR3FProps, 'groupRef'>;
 

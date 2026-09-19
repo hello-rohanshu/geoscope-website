@@ -30,6 +30,8 @@ import {
  *  is "how many pages each chapter has." */
 const PLAYHEAD_RATE: number = 0.03;
 
+const SPHERE_AUTOROTATE_RATE = 0.0; // was 0.004
+
 /** Fold animation delay across faces: 0 = lockstep movement, >0 = wave/cascade across faces. */
 const STAGGER_RATIO: number = 0.0;
 
@@ -61,6 +63,7 @@ const RESET_EASE = 0.0618;
 /** If true, wheel zoom keeps the point under the cursor fixed on screen.
  *  If false, zoom is centered on the map center. */
 const ZOOM_TO_CURSOR: boolean = false;
+
 
 // Tight axis-aligned bounds of the flat Dymaxion net, computed once.
 // Used to clamp pan so the user can't drag the map off into empty space.
@@ -210,6 +213,7 @@ const GlobeR3F = forwardRef<GlobeControls, GlobeR3FProps>(function GlobeR3F({
 
   const overlayBuffersRef = useRef<OverlayBuffers | null>(null);
   const overlayPointsRef = useRef<THREE.Points | null>(null);
+  const hitsGlobeRef = useRef(false);
 
   // R3F owns the renderer, scene and camera now — no sceneRef/cameraRef/
   // rendererRef of our own. `camera` is the same PerspectiveCamera instance
@@ -436,7 +440,34 @@ const GlobeR3F = forwardRef<GlobeControls, GlobeR3FProps>(function GlobeR3F({
   // rather than via a per-component style prop.
   useEffect(() => {
     gl.domElement.style.cursor = 'grab';
+    gl.domElement.style.touchAction = 'none';
   }, [gl]);
+
+  useEffect(() => {
+    const dom = gl.domElement;
+    const onDown = (e: PointerEvent) => {
+      const rect = dom.getBoundingClientRect();
+      const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      // Flat mode: the map fills the screen, so any drag on the canvas pans.
+      if (animRef.current.t >= GLOBE_STAGES.DYMAXION) {
+        hitsGlobeRef.current = true;
+        return;
+      }
+
+      // Sphere mode: only drags starting inside the globe's on-screen disc count.
+      const cam = camera as THREE.PerspectiveCamera;
+      const halfH = Math.tan((cam.fov * Math.PI) / 360) * cam.position.z;
+      const halfW = halfH * cam.aspect;
+      const rx = 1 / halfW;
+      const ry = 1 / halfH;
+      hitsGlobeRef.current =
+        (nx * nx) / (rx * rx) + (ny * ny) / (ry * ry) <= 1;
+    };
+    dom.addEventListener('pointerdown', onDown, { capture: true });
+    return () => dom.removeEventListener('pointerdown', onDown, { capture: true });
+  }, [gl, camera]);
 
   // Stable target object for useGesture so it doesn't rebind every render —
   // gl (and therefore gl.domElement) doesn't change for the Canvas's lifetime.
@@ -450,6 +481,7 @@ const GlobeR3F = forwardRef<GlobeControls, GlobeR3FProps>(function GlobeR3F({
       // Sphere mode: drag rotates. Flat mode: drag pans. Pointer Events
       // under the hood, so this also covers single-finger touch drag.
       onDrag: ({ first, last, delta: [dx, dy] }) => {
+        if (!hitsGlobeRef.current) return;
         if (first) {
           smoothViewRef.current = false;
           animRef.current.drag = false;
@@ -707,7 +739,7 @@ const GlobeR3F = forwardRef<GlobeControls, GlobeR3FProps>(function GlobeR3F({
     if (!drag && groupRef.current) {
       if (animRef.current.tgt === GLOBE_STAGES.SPHERE && animRef.current.t < 0.05) {
         // Slow continuous rotation on default sphere view
-        groupRef.current.rotation.y += 0.004;
+        groupRef.current.rotation.y += SPHERE_AUTOROTATE_RATE;
       } else if (animRef.current.tgt >= GLOBE_STAGES.DYMAXION) {
         // Damped realignment to face flat net towards camera when fully unfolded.
         // Holds through stage 4 as well, so the flat net stays square-on while wires retract.

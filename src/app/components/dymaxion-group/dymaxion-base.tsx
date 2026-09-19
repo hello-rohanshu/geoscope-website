@@ -164,7 +164,6 @@ export default function DymaxionBase() {
           <div
             className="w-full aspect-[2/1] max-h-[420px] relative overflow-hidden flex items-center justify-center"
             style={{
-              background: "var(--color-surface-elevated)",
               boxShadow: "var(--color-shadow)",
             }}
           >

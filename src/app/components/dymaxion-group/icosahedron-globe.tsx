@@ -545,7 +545,7 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
     if (!canvas) return;
 
     // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     rendererRef.current = renderer;
 
@@ -775,7 +775,7 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
           cursor: 'grab',
           touchAction: 'none',
           background: 'transparent',
-          border: '2px solid white',
+          border: '0px solid white',
           width: '100%',
           height: '100%',
           ...style,

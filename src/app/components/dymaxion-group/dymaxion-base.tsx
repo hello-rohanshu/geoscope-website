@@ -19,6 +19,9 @@ interface LayerDef {
   threshold: number;
   maxSamples?: number;
   stride?: number;
+  targetWidth?: number;
+  targetHeight?: number;
+  resampleMethod?: "nearest" | "bilinear";
 }
 
 const LAYERS: LayerDef[] = [
@@ -27,9 +30,10 @@ const LAYERS: LayerDef[] = [
     label: "Population Density (2024)",
     url: "/population_2024_1440x720_cog.tif",
     color: "#ff3b3b",
-    size: 0.012,
-    opacity: 0.35,
+    size: 0.006,
+    opacity: 0.7,
     threshold: 0,
+    // no targetWidth/Height — loads full res, already fast
   },
   {
     id: "blackmarble",
@@ -37,10 +41,11 @@ const LAYERS: LayerDef[] = [
     url: "/BlackMarble_2016_3km_gray_geo_cog.tif",
     color: "#ffd97a",
     size: 0.006,
-    opacity: 0.5,
-    threshold: 40,
-    maxSamples: 200_000,
-    stride: 2,
+    opacity: 0.7,
+    threshold: 0,
+    targetWidth: 2700,   // half of 13500, still sharp enough
+    targetHeight: 1350,
+    resampleMethod: "nearest",
   },
 ];
 
@@ -90,7 +95,7 @@ export default function DymaxionBase() {
     setLoading(true);
 
     (async () => {
-      const ok = await loadRaster(layer.id, layer.url);
+      const ok = await loadRaster(layer.id, layer.url, layer.targetWidth, layer.targetHeight, layer.resampleMethod);
       if (!ok || cancelled) {
         setLoading(false);
         return;

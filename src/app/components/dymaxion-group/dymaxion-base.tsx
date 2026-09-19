@@ -120,12 +120,35 @@ export default function DymaxionBase() {
     };
   }, [activeLayerId]);
 
+  /**
+   * Drop any active overlay the moment the globe stops being fully unfolded.
+   * Folding is a "put it away" gesture — leaving a data layer lit on a
+   * partially folded globe reads as a stale/buggy state, so we clear it here
+   * rather than relying on every caller to remember.
+   */
+  useEffect(() => {
+    if (stage < GLOBE_STAGES.WIRES_GONE) {
+      setActiveLayerId(null);
+    }
+  }, [stage]);
+
   const activeLayer = activeLayerId
     ? LAYERS.find((l) => l.id === activeLayerId)
     : null;
 
   const atFlat = stage >= GLOBE_STAGES.DYMAXION;
   const isUnfolded = stage >= GLOBE_STAGES.WIRES_GONE;
+
+  /**
+   * Single-active toggle: checking an unchecked layer activates it; checking
+   * the already-active layer clears the selection. This replaces the old
+   * radio group + explicit "Off" row — one fewer control, same behavior.
+   * (Single-active is dictated by the globe's overlay API, which only accepts
+   * one color/size/opacity set at a time.)
+   */
+  const toggleLayer = (id: LayerId) => {
+    setActiveLayerId((current) => (current === id ? null : id));
+  };
 
   return (
     <div className="w-full flex flex-col items-center pointer-events-auto select-none">
@@ -136,6 +159,8 @@ export default function DymaxionBase() {
         {/* 
             INTENTIONALITY: Equalized button geometry (`w-36 h-9`) matching design tokens.
             No borders; surface elevation distinguish state changes cleanly without jumps.
+            This is the one control that survives BOTH folded and unfolded states — every
+            other piece of chrome is gated behind `isUnfolded`.
         */}
         <button
           type="button"
@@ -163,8 +188,10 @@ export default function DymaxionBase() {
           INTENTIONALITY: Unframed Grid with Zero Borders.
           Panels use exact CSS system tokens (`var(--color-surface)`, `var(--color-surface-elevated)`) 
           and native shadows to float seamlessly over the site backdrop.
+          `items-stretch` (explicit, though it's the grid default) is what lets the
+          overlay panel fill the full height of the canvas column on desktop.
       */}
-      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
 
         {/* Canvas & Timeline Track */}
         <div className="lg:col-span-2 w-full flex flex-col gap-3">
@@ -204,22 +231,23 @@ export default function DymaxionBase() {
           </div>
 
           {/* 
-              INTENTIONALITY: Map controls fade in only once the fold has settled flat.
-              Zoom and pan have no meaning on a sphere, so rendering them earlier
-              would be dead chrome. `tabIndex` is mirrored to the same gate so
-              keyboard users can't tab into invisible, unusable buttons — the same
-              discipline the `pointer-events-none` class already enforces for mice.
+              INTENTIONALITY: Map controls fade in only once the unfold has fully
+              completed. Zoom and pan have no meaning on a sphere (or mid-fold), so
+              rendering them earlier would be dead chrome. `tabIndex` is mirrored to
+              the same gate so keyboard users can't tab into invisible, unusable
+              buttons — the same discipline the `pointer-events-none` class already
+              enforces for mice.
           */}
           <div
-            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
+            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${isUnfolded ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
-            aria-hidden={!atFlat}
+            aria-hidden={!isUnfolded}
           >
             <button
               type="button"
               onClick={() => globeRef.current?.zoomIn()}
               aria-label="Zoom in"
-              tabIndex={atFlat ? 0 : -1}
+              tabIndex={isUnfolded ? 0 : -1}
               className="w-9 h-9 flex items-center justify-center text-base font-medium cursor-pointer outline-none"
               style={{
                 background: "var(--color-surface)",
@@ -233,7 +261,7 @@ export default function DymaxionBase() {
               type="button"
               onClick={() => globeRef.current?.zoomOut()}
               aria-label="Zoom out"
-              tabIndex={atFlat ? 0 : -1}
+              tabIndex={isUnfolded ? 0 : -1}
               className="w-9 h-9 flex items-center justify-center text-base font-medium cursor-pointer outline-none"
               style={{
                 background: "var(--color-surface)",
@@ -246,7 +274,7 @@ export default function DymaxionBase() {
             <button
               type="button"
               onClick={() => globeRef.current?.resetView()}
-              tabIndex={atFlat ? 0 : -1}
+              tabIndex={isUnfolded ? 0 : -1}
               className="h-9 px-4 flex items-center justify-center text-xs md:text-sm font-medium cursor-pointer outline-none"
               style={{
                 background: "var(--color-surface)",
@@ -258,25 +286,33 @@ export default function DymaxionBase() {
             </button>
           </div>
 
+          {/* 
+              Timeline placeholder. Now matches the overlay panel's surface color so
+              the two read as one family of floating cards. The "coming soon" tag is
+              rendered inline beside the label rather than replacing it.
+          */}
           <div
-            className={`w-full h-9 flex items-center justify-center text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
+            className={`w-full h-9 flex items-center justify-center gap-3 text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${isUnfolded ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
+            aria-hidden={!isUnfolded}
             style={{
-              background: "var(--color-progress-track)",
+              background: "var(--color-surface)",
               color: "var(--color-text-muted)",
             }}
           >
-            Timeline Track
+            <span>Timeline</span>
+            <span>🚧 Coming soon</span>
           </div>
         </div>
 
         {/* Floating Overlay Controls */}
         <div
-          className={`lg:col-span-1 w-full transition-opacity duration-300 ${atFlat ? "opacity-100" : "opacity-0 pointer-events-none"
+          className={`lg:col-span-1 w-full transition-opacity duration-300 ${isUnfolded ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
+          aria-hidden={!isUnfolded}
         >
           <div
-            className="p-5 flex flex-col gap-3"
+            className="p-5 flex flex-col gap-3 h-full"
             style={{
               background: "var(--color-surface)",
               boxShadow: "var(--color-shadow)",
@@ -289,37 +325,43 @@ export default function DymaxionBase() {
               Overlays
             </h2>
 
+            {/* 
+                INTENTIONALITY: Square, sharp-cornered checkboxes replace the old
+                radio group + explicit "Off" row. `appearance-none` gives us full
+                control over the box geometry so it honors the zero-radius design
+                language (native checkboxes round their corners on some platforms).
+                Unchecked uses the page background — a recessed square that stays
+                visible against the panel; checked fills with the accent color.
+                Single-active by design — see `toggleLayer` above.
+            */}
             <div className="flex flex-col gap-2">
-              <label
-                className="flex items-center gap-3 text-sm cursor-pointer select-none transition-colors duration-150"
-                style={{ color: "var(--color-text)" }}
-              >
-                <input
-                  type="radio"
-                  name="layer"
-                  checked={activeLayerId === null}
-                  onChange={() => setActiveLayerId(null)}
-                  className="accent-[var(--color-accent)] cursor-pointer"
-                />
-                <span>Off</span>
-              </label>
-
-              {LAYERS.map((l) => (
-                <label
-                  key={l.id}
-                  className="flex items-center gap-3 text-sm cursor-pointer select-none transition-colors duration-150"
-                  style={{ color: "var(--color-text)" }}
-                >
-                  <input
-                    type="radio"
-                    name="layer"
-                    checked={activeLayerId === l.id}
-                    onChange={() => setActiveLayerId(l.id)}
-                    className="accent-[var(--color-accent)] cursor-pointer"
-                  />
-                  <span>{l.label}</span>
-                </label>
-              ))}
+              {LAYERS.map((l) => {
+                const checked = activeLayerId === l.id;
+                return (
+                  <label
+                    key={l.id}
+                    className="flex items-center gap-3 text-sm cursor-pointer select-none transition-colors duration-150"
+                    style={{ color: "var(--color-text)" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleLayer(l.id)}
+                      className="appearance-none w-4 h-4 shrink-0 cursor-pointer"
+                      style={{
+                        backgroundColor: "var(--color-bg)",
+                        backgroundImage: checked
+                          ? "linear-gradient(var(--color-accent), var(--color-accent))"
+                          : "none",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                        backgroundSize: "8px 8px",
+                      }}
+                    />
+                    <span>{l.label}</span>
+                  </label>
+                );
+              })}
             </div>
 
             {loading && (

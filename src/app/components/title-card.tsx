@@ -13,9 +13,9 @@ export default function GeoscopeTitleCard() {
       </div>
 
       {/* Responsive Left-Aligned WIP Badge */}
-      <div className="mt-8 sm:mt-16 ml-2 inline-flex items-center gap-2 sm:gap-4 px-3 py-2 sm:px-6 sm:py-3 bg-[var(--color-surface)] text-yellow-400 font-[var(--font-mono)] uppercase tracking-widest text-xs sm:text-base md:text-lg">
-        <span className="text-lg sm:text-3xl md:text-4xl animate-pulse">🏗️</span>
-        <span>Work in Progress</span>
+      <div className="mt-8 sm:mt-16 ml-2 inline-flex items-center gap-2 sm:gap-4 px-2 py-1 sm:px-4 sm:py-3 bg-[var(--color-surface)] text-yellow-400 font-[var(--font-mono)] uppercase tracking-widest text-xs sm:text-base md:text-lg">
+        <span className="text-lg sm:text-2xl md:text-3xl">🏗️</span>
+        <span className="">Work in Progress</span>
       </div>
     </div>
   );

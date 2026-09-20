@@ -1,80 +1,52 @@
-"use client";
+import React from 'react';
 
-import React from "react";
-
-interface DomainPanel {
-  mainTitle: string;
-  secondaryHeading: string;
-  href: string;
+interface Domain {
+  id: string;
+  title: string;
 }
 
-const domainPanelsData: DomainPanel[] = [
-  { mainTitle: "Earth Systems", secondaryHeading: "Fuel system", href: "/earth-systems" },
-  { mainTitle: "Culture", secondaryHeading: "Crew Harmony", href: "/culture" },
-  { mainTitle: "Standard of life", secondaryHeading: "Life Support", href: "/standard-of-life" },
-  { mainTitle: "Science", secondaryHeading: "Navigation", href: "/science" },
+const DOMAINS: Domain[] = [
+  { id: '01', title: 'Fuel system' },
+  { id: '02', title: 'Crew harmony' },
+  { id: '03', title: 'Standard of life' },
+  { id: '04', title: 'Navigation' },
 ];
 
 export const DomainPanels: React.FC = () => {
   return (
-    <div className="min-h-screen w-full max-w-5xl mx-auto p-8 md:p-16 flex items-center justify-center pointer-events-auto">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 w-full">
-        {domainPanelsData.map((card, idx) => (
-          <a
-            key={idx}
-            href={card.href}
-            className="group aspect-square md:aspect-[4/3] w-full flex flex-col justify-between p-6 md:p-8 rounded-none outline-none transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-[var(--color-accent)] cursor-pointer select-none"
-            style={{
-              background: "var(--color-surface)",
-              boxShadow: "var(--color-shadow)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--color-surface-elevated)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "var(--color-surface)";
-            }}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-overline font-medium truncate">
-                {card.secondaryHeading}
-              </span>
-              <span
-                className="text-xs transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                style={{ color: "var(--color-text-muted)" }}
-              >
-                ↗
-              </span>
-            </div>
+    <div className="relative w-full min-h-[80vh] flex flex-col justify-center py-4 sm:py-8 m-0 p-0">
+      {/* Left-aligned Header */}
+      <div className="w-full mb-6 sm:mb-8">
+        <h1 className="title-section text-[var(--color-header-text)]">
+          Dashboard
+        </h1>
+      </div>
 
-            {/* Data Placeholder */}
+      {/* Panels Container - Full Horizontal Width */}
+      <div className="relative w-full">
+        {/* Subtle Blur Overlay */}
+        <div className="absolute inset-0 z-20 backdrop-blur-[2px] bg-[var(--color-bg)]/20 flex items-center justify-center pointer-events-none">
+          <div className="bg-[var(--color-surface-elevated)] text-yellow-400 font-[var(--font-mono)] text-xs sm:text-sm uppercase tracking-wider px-5 py-2.5">
+            🚧 work in progress
+          </div>
+        </div>
+
+        {/* 2x2 Responsive Full-Width Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10 md:gap-12 w-full">
+          {DOMAINS.map((domain) => (
             <div
-              className="my-auto w-full h-1/2 flex items-center justify-center opacity-40 transition-opacity group-hover:opacity-75"
-              style={{ background: "var(--color-progress-track)" }}
+              key={domain.id}
+              className="bg-[var(--color-surface)] p-6 sm:p-8 min-h-[140px] sm:min-h-[180px] md:min-h-[220px] flex flex-col justify-between"
             >
-              <span
-                className="text-xs uppercase tracking-widest font-mono"
-                style={{ color: "var(--color-text-muted)" }}
-              >
-                [ Data Pending ]
+              <span className="font-[var(--font-mono)] text-[10px] sm:text-xs text-[var(--color-text-muted)]">
+                {domain.id}
               </span>
-            </div>
-
-            {/* Footer */}
-            <div>
-              <h3
-                className="text-lg md:text-xl font-semibold tracking-tight transition-colors duration-200 m-0"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  color: "var(--color-text)",
-                }}
-              >
-                {card.mainTitle}
+              <h3 className="title-card text-base sm:text-lg lg:text-xl font-normal text-[var(--color-text)]">
+                {domain.title}
               </h3>
             </div>
-          </a>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

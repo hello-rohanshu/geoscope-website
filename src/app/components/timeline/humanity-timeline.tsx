@@ -320,6 +320,13 @@ export default function HumanityTimeline() {
             </span>
           </div>
         </div>
+
+        <p
+          className="w-full text-center mt-6 md:mt-8 text-[11px] sm:text-xs italic"
+          style={{ color: "var(--color-header-text, #ffffff)" }}
+        >
+          From the Operating Manual for Spaceship Earth
+        </p>
       </div>
     </>
   );

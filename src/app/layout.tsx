@@ -4,7 +4,7 @@ import { fontBody, fontDisplay } from './fonts'
 
 export const metadata: Metadata = {
   title: 'Geoscope - Alpha',
-  description: 'Inspired by R. Buckminster Fuller',
+  description: 'Dedicated to R. Buckminster Fuller',
   icons: {
     icon: [
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },

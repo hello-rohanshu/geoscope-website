@@ -2,7 +2,7 @@
 
 import React from "react";
 import NavigationPortal from "./portal";
-import PortalCard from "../../components/portal-design";
+import PortalCard from "../../components/portal-design/portal-design";
 import { Navigation } from "lucide-react";
 
 export default function SciencePage() {

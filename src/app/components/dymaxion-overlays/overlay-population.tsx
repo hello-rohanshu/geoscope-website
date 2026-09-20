@@ -8,10 +8,10 @@ import {
   getRasterDimensions,
   getValueAtIndex,
   getLonLatForIndex,
-} from "@/lib/raster-engine";
-import { useMapProjection } from "../dymaxion-map";
+} from "@/utils/raster-engine"
+import { useMapProjection } from "../dymaxion-group/[reference]-dymaxion-map-basic";
 
-const RASTER_URL = "/population_2024_1440x720.tif";
+const RASTER_URL = "/population_2024_1440x720_cog.tif";
 
 /* ------------------ CONTROLS ------------------ */
 const samplingStep = 1; // 1 = every raster cell

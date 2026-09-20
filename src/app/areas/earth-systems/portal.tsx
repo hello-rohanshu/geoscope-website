@@ -2,11 +2,11 @@
 import React from "react";
 import { Zap } from "lucide-react";
 
-import FuelReliancePie from "../../components/fuel-reliance-pie";
-import TwoGaugesHorizontal from "../../components/fuel-guages-horizontal";
-import EnergyConsumptionChart from "../../components/fuel-graph";
+import FuelReliancePie from "../../components/portal-fuel/fuel-reliance-pie";
+import TwoGaugesHorizontal from "../../components/portal-fuel/fuel-guages-horizontal";
+import EnergyConsumptionChart from "../../components/portal-fuel/fuel-graph";
 
-import { PortalConfig } from "../../components/portal-config";
+import { PortalConfig } from "../../components/portal-design/portal-config";
 
 const FuelMetricCard = () => (
   <div className="flex w-full h-full flex-col justify-between">

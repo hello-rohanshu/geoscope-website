@@ -286,8 +286,8 @@ export default function DymaxionBase() {
               color: "var(--color-text-muted)",
             }}
           >
-            <span>Timeline</span>
-            <span>🚧 Coming soon</span>
+            <span>Timeline Coming Soon</span>
+            {/* <span>Coming soon</span> */}
           </div>
         </div>
 
@@ -350,10 +350,10 @@ export default function DymaxionBase() {
             </div>
 
             <div
-              className="mt-2 pt-3 text-base text-center"
+              className="mt-2 pt-3 text-base text-center opacity-70 text-bold"
               style={{ color: "var(--color-text-muted)" }}
             >
-              🚧 More overlays coming soon
+              More overlays coming soon
             </div>
           </div>
         </div>

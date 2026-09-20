@@ -158,14 +158,15 @@ export default function DymaxionBase() {
     <div className="w-full flex flex-col items-center pointer-events-auto select-none max-w-none">
       {/* Dynamic Grid Layout with smooth grid-template-columns transition */}
       <div
-        className={`w-full grid transition-all duration-500 ease-in-out items-stretch ${uiVisible
+        className={`w-full grid transition-all duration-500 ease-in-out items-stretch ${
+          uiVisible
             ? "grid-cols-1 lg:grid-cols-[2fr_1fr] lg:gap-6"
             : "grid-cols-1 lg:grid-cols-[1fr_0fr] lg:gap-0"
-          }`}
+        }`}
       >
         {/* Canvas & Floating HUD Area */}
         <div className="w-full flex flex-col gap-3 min-w-0">
-
+          
           {/* Action Bar - Positioned outside and left-aligned so it doesn't move during grid resize */}
           <div className="w-full flex items-center justify-start">
             <button
@@ -191,7 +192,7 @@ export default function DymaxionBase() {
           </div>
 
           <div
-            className="w-full aspect-[16/9] max-h-[600px] min-h-[380px] relative overflow-hidden flex items-center justify-center rounded-none"
+            className="w-full aspect-[16/9] max-h-[480px] min-h-[320px] relative overflow-hidden flex items-center justify-center rounded-none"
             data-globe-hit
             data-globe-flat={atFlat ? "" : undefined}
             style={{
@@ -218,10 +219,11 @@ export default function DymaxionBase() {
 
             {/* FLOATING SPACE HUD TELEMETRY (Only active when folded) */}
             <div
-              className={`absolute bottom-3 left-3 right-3 md:top-0 md:left-0 md:right-auto md:bottom-auto z-10 md:w-72 p-3 bg-black/40 backdrop-blur-sm md:p-0 md:bg-transparent md:backdrop-blur-none transition-all duration-500 transform ${hudVisible
+              className={`absolute top-4 left-4 md:top-0 md:left-0 z-10 w-48 md:w-72 transition-all duration-500 transform ${
+                hudVisible
                   ? "opacity-100 translate-y-0 pointer-events-auto"
                   : "opacity-0 -translate-y-2 pointer-events-none"
-                }`}
+              }`}
             >
               <EarthInfo />
             </div>
@@ -229,8 +231,9 @@ export default function DymaxionBase() {
 
           {/* Map Controls */}
           <div
-            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-              }`}
+            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${
+              uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
             aria-hidden={!uiVisible}
           >
             <button
@@ -278,8 +281,9 @@ export default function DymaxionBase() {
 
           {/* Timeline Placeholder */}
           <div
-            className={`w-full h-12 flex items-center justify-center gap-3 text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-              }`}
+            className={`w-full h-12 flex items-center justify-center gap-3 text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${
+              uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
             aria-hidden={!uiVisible}
             style={{
               background: "var(--color-surface)",
@@ -293,10 +297,11 @@ export default function DymaxionBase() {
 
         {/* Side Panel: Overlay Controls */}
         <div
-          className={`w-full h-full overflow-hidden transition-all duration-500 ease-in-out ${uiVisible
+          className={`w-full h-full overflow-hidden transition-all duration-500 ease-in-out ${
+            uiVisible
               ? "opacity-100 pointer-events-auto"
               : "opacity-0 pointer-events-none"
-            }`}
+          }`}
         >
           <div
             className="p-5 flex flex-col gap-3 h-full min-w-[280px]"

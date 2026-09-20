@@ -19,7 +19,11 @@ function Section({
 }) {
   return (
     <section
+<<<<<<< HEAD
       className={`relative z-10 flex min-h-[100svh] w-full items-center justify-center pl-6 pr-14 sm:pl-7 sm:pr-21 md:pl-10 md:pr-24 lg:px-24 py-8 ${className}`}
+=======
+      className={`relative z-10 flex min-h-[100svh] w-full items-center justify-center pl-6 pr-14 sm:pl-7 sm:pr-21 md:pl-13 md:pr-24 lg:px-24 py-8 ${className}`}
+>>>>>>> a493ecf (layout: make layout have more margin on right on non-desktop-sizes so there is space to scroll via touch)
     >
       <div className="w-full max-w-7xl flex items-center justify-center z-20">
         {children}

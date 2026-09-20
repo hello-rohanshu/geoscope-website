@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { fontBody, fontDisplay } from './fonts'
 
 export const metadata: Metadata = {
-  title: 'Geoscope',
+  title: 'Geoscope - Alpha',
   description: 'Inspired by R. Buckminster Fuller',
   icons: {
     icon: [

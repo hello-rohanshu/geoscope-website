@@ -14,7 +14,7 @@ export default function EarthInfo({ className = "" }: { className?: string }) {
     >
       <h2 className="title-section">Spaceship Earth</h2>
 
-      <div className="hidden md:flex md:flex-col gap-x-4 gap-y-1 text-xs md:text-sm text-foreground">
+      <div className="hidden md:flex md:flex-col gap-x-4 gap-y-1 text-sm md:text-base text-foreground mt-4">
         <p>
           <span className="font-semibold tabular-nums">{EARTH.age}</span> years old
         </p>

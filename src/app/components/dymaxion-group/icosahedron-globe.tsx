@@ -195,14 +195,14 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
   const wiresRef = useRef<THREE.LineSegments[]>([]);
 
   // Mutable animation state container to avoid react re-renders on every frame
-const animRef = useRef<AnimState>({
-  t: stage,
-  tgt: stage,
-  drag: false,
-  rotX: 0,
-  rotY: 0,
-  frameId: 0,
-});
+  const animRef = useRef<AnimState>({
+    t: stage,
+    tgt: stage,
+    drag: false,
+    rotX: 0,
+    rotY: 0,
+    frameId: 0,
+  });
 
   /**
    * Map-mode view state. Only meaningful once the fold is fully flat.
@@ -523,36 +523,6 @@ const animRef = useRef<AnimState>({
     }
   );
 
-  // Responsive resize handler listening to parent container dimensions
-  useEffect(() => {
-    const container = containerRef.current;
-    const canvas = canvasRef.current;
-    if (!container || !canvas) return;
-
-    const resizeCanvas = () => {
-      const rect = container.getBoundingClientRect();
-      const w = width || rect.width;
-      const h = height || rect.height;
-
-      canvas.width = w;
-      canvas.height = h;
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-
-      if (rendererRef.current) rendererRef.current.setSize(w, h, false);
-      if (cameraRef.current) {
-        cameraRef.current.aspect = w / h;
-        cameraRef.current.updateProjectionMatrix();
-      }
-    };
-
-    resizeCanvas();
-    const resizeObserver = new ResizeObserver(resizeCanvas);
-    resizeObserver.observe(container);
-
-    return () => resizeObserver.disconnect();
-  }, [width, height]);
-
   // Primary WebGL Scene, Camera, Geometry & Material initialization
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -636,9 +606,12 @@ const animRef = useRef<AnimState>({
       renderer.dispose();
       scene.clear();
     };
-  }, [width, height, updateGeometry]);
+  }, [updateGeometry]);
 
-  // Hot-swap face materials when baseLayer configuration changes
+  // Hot-swap face materials only when mode or texture actually changes
+  const baseMode = baseLayer?.mode;
+  const baseTexture = baseLayer?.mode === "texture" ? baseLayer.texture : null;
+
   useEffect(() => {
     if (!meshesRef.current.length) return;
     const newMaterials = createFaceMaterials(baseLayer);
@@ -646,7 +619,7 @@ const animRef = useRef<AnimState>({
       (mesh.material as THREE.Material).dispose();
       mesh.material = newMaterials[fi];
     });
-  }, [baseLayer]);
+  }, [baseMode, baseTexture]);
 
   // Rebuild point overlay buffers when overlay samples are updated
   useEffect(() => {
@@ -808,6 +781,21 @@ const animRef = useRef<AnimState>({
 
         if (smoothViewRef.current && panSettled && camSettled) {
           smoothViewRef.current = false;
+        }
+      }
+      // Sync canvas size right before drawing
+      const renderer = rendererRef.current;
+      const canvasEl = canvasRef.current;
+      if (renderer && canvasEl && cam) {
+        const w = width || canvasEl.clientWidth;
+        const h = height || canvasEl.clientHeight;
+        const pixelRatio = renderer.getPixelRatio();
+        const targetW = Math.floor(w * pixelRatio);
+        const targetH = Math.floor(h * pixelRatio);
+        if (w > 0 && h > 0 && (canvasEl.width !== targetW || canvasEl.height !== targetH)) {
+          renderer.setSize(w, h, false);
+          cam.aspect = w / h;
+          cam.updateProjectionMatrix();
         }
       }
 

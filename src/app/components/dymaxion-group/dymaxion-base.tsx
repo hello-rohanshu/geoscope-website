@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import IcosahedronGlobe, { type GlobeControls } from "./icosahedron-globe";
+import EarthInfo from "../earth-info";
 import { GLOBE_STAGES } from "@/utils/icosahedron-geometry";
 import { loadRaster } from "@/utils/raster-engine";
 import { collectRasterSamples, OverlaySample } from "@/utils/overlay-layer";
@@ -33,7 +34,6 @@ const LAYERS: LayerDef[] = [
     size: 0.006,
     opacity: 0.6,
     threshold: 0,
-    // no targetWidth/Height — loads full res, already fast
   },
   {
     id: "blackmarble",
@@ -43,9 +43,8 @@ const LAYERS: LayerDef[] = [
     size: 0.006,
     opacity: 1,
     threshold: 20,
-    // maxSamples: 200_000,
     stride: 2,
-    targetWidth: 2700,   // half of 13500, still sharp enough
+    targetWidth: 2700,
     targetHeight: 1350,
     resampleMethod: "nearest",
   },
@@ -60,17 +59,9 @@ export default function DymaxionBase() {
   const [targetStage, setTargetStage] = useState<number>(GLOBE_STAGES.SPHERE);
 
   const lastLayerRef = useRef<LayerDef | null>(null);
-
   const samplesCacheRef = useRef<Map<LayerId, OverlaySample[]>>(new Map());
-
-  /**
-   * Imperative handle to the globe's map-view API. Zoom and reset are
-   * commands, not state — they bypass React's render cycle on purpose,
-   * so a wheel-scroll or button-mash never re-renders the whole tree.
-   */
   const globeRef = useRef<GlobeControls>(null);
 
-  // Load Earth texture
   useEffect(() => {
     const loader = new THREE.TextureLoader();
     const tex = loader.load("/earth_day.jpg");
@@ -82,11 +73,8 @@ export default function DymaxionBase() {
     setEarthTexture(tex);
   }, []);
 
-  // Load / switch active raster layer
   useEffect(() => {
-    if (!activeLayerId) {
-      return;
-    }
+    if (!activeLayerId) return;
 
     const cached = samplesCacheRef.current.get(activeLayerId);
     if (cached) {
@@ -99,7 +87,13 @@ export default function DymaxionBase() {
     setLoading(true);
 
     (async () => {
-      const ok = await loadRaster(layer.id, layer.url, layer.targetWidth, layer.targetHeight, layer.resampleMethod);
+      const ok = await loadRaster(
+        layer.id,
+        layer.url,
+        layer.targetWidth,
+        layer.targetHeight,
+        layer.resampleMethod
+      );
       if (!ok || cancelled) {
         setLoading(false);
         return;
@@ -122,14 +116,11 @@ export default function DymaxionBase() {
     };
   }, [activeLayerId]);
 
-  // Release the sample payload once the layer has been off long enough for
-  // the globe to finish easing the overlay out. The globe owns the fade now,
-  // so we can't synchronously drop the points the moment opacity hits zero —
-  // we'd cut the fade short.
   useEffect(() => {
-    const target = activeLayerId && samples.length > 0
-      ? (LAYERS.find((l) => l.id === activeLayerId)?.opacity ?? 1)
-      : 0;
+    const target =
+      activeLayerId && samples.length > 0
+        ? LAYERS.find((l) => l.id === activeLayerId)?.opacity ?? 1
+        : 0;
     if (target > 0 || samples.length === 0) return;
     const t = setTimeout(() => {
       setSamples((s) => (s.length ? [] : s));
@@ -137,12 +128,6 @@ export default function DymaxionBase() {
     return () => clearTimeout(t);
   }, [activeLayerId, samples.length]);
 
-  /**
-   * Drop any active overlay the moment the globe stops being fully unfolded.
-   * Folding is a "put it away" gesture — leaving a data layer lit on a
-   * partially folded globe reads as a stale/buggy state, so we clear it here
-   * rather than relying on every caller to remember.
-   */
   useEffect(() => {
     if (stage < GLOBE_STAGES.WIRES_GONE) {
       setActiveLayerId(null);
@@ -155,37 +140,21 @@ export default function DymaxionBase() {
 
   if (activeLayer) lastLayerRef.current = activeLayer;
   const visualLayer = activeLayer ?? lastLayerRef.current;
-  // Target opacity for the globe. The globe eases the material toward this
-  // value every frame, so we can hand it a step change without any popping.
-  const targetOpacity = activeLayerId && samples.length > 0
-    ? (LAYERS.find((l) => l.id === activeLayerId)?.opacity ?? 1)
-    : 0;
+  const targetOpacity =
+    activeLayerId && samples.length > 0
+      ? LAYERS.find((l) => l.id === activeLayerId)?.opacity ?? 1
+      : 0;
   const atFlat = stage >= GLOBE_STAGES.DYMAXION;
-  const isUnfolded = stage >= GLOBE_STAGES.DYMAXION;
+  const isUnfolded = targetStage >= GLOBE_STAGES.DYMAXION;
 
-  /**
-   * Single-active toggle: checking an unchecked layer activates it; checking
-   * the already-active layer clears the selection. This replaces the old
-   * radio group + explicit "Off" row — one fewer control, same behavior.
-   * (Single-active is dictated by the globe's overlay API, which only accepts
-   * one color/size/opacity set at a time.)
-   */
   const toggleLayer = (id: LayerId) => {
     setActiveLayerId((current) => (current === id ? null : id));
   };
 
   return (
-    <div className="w-full flex flex-col items-center pointer-events-auto select-none">
+    <div className="w-full flex flex-col items-center pointer-events-auto select-none max-w-none">
       {/* Header Bar */}
-      <div className="w-full mb-3 md:mb-4 flex items-center justify-between shrink-0">
-        {/* <h1 className="title-section">Dymaxion Projection</h1> */}
-
-        {/* 
-            INTENTIONALITY: Equalized button geometry (`w-36 h-9`) matching design tokens.
-            No borders; surface elevation distinguish state changes cleanly without jumps.
-            This is the one control that survives BOTH folded and unfolded states — every
-            other piece of chrome is gated behind `isUnfolded`.
-        */}
+      <div className="w-full mb-3 md:mb-4 flex items-center justify-end shrink-0">
         <button
           type="button"
           onClick={() =>
@@ -208,60 +177,53 @@ export default function DymaxionBase() {
         </button>
       </div>
 
-      {/* 
-          INTENTIONALITY: Unframed Grid with Zero Borders.
-          Panels use exact CSS system tokens (`var(--color-surface)`, `var(--color-surface-elevated)`) 
-          and native shadows to float seamlessly over the site backdrop.
-          `items-stretch` (explicit, though it's the grid default) is what lets the
-          overlay panel fill the full height of the canvas column on desktop.
-      */}
-      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-
-        {/* Canvas & Timeline Track */}
-        <div className="lg:col-span-2 w-full flex flex-col gap-3">
+      {/* Dynamic Grid Layout with smooth grid-template-columns transition */}
+      <div
+        className={`w-full grid transition-all duration-500 ease-in-out items-stretch ${isUnfolded
+          ? "grid-cols-1 lg:grid-cols-[2fr_1fr] lg:gap-6"
+          : "grid-cols-1 lg:grid-cols-[1fr_0fr] lg:gap-0"
+          }`}
+      >
+        {/* Canvas & Floating HUD Area */}
+        <div className="w-full flex flex-col gap-3 min-w-0">
           <div
-            className="w-full aspect-[2/1] max-h-[420px] relative overflow-hidden flex items-center justify-center"
+            className="w-full aspect-[16/9] max-h-[600px] min-h-[380px] relative overflow-hidden flex items-center justify-center rounded-none"
             data-globe-hit
             data-globe-flat={atFlat ? "" : undefined}
             style={{
               boxShadow: "var(--color-shadow)",
+              border: "0px solid white",
             }}
           >
-            {earthTexture ? (
-              <IcosahedronGlobe
-                ref={globeRef}
-                stage={targetStage}
-                onStageChange={setStage}
-                overlaySamples={samples}
-                showOverlay={samples.length > 0}
-                overlayColor={visualLayer?.color}
-                overlaySize={visualLayer?.size}
-                overlayOpacity={targetOpacity}
-                baseLayer={{ mode: "texture", texture: earthTexture }}
-              />
-            ) : (
-              <IcosahedronGlobe
-                ref={globeRef}
-                stage={targetStage}
-                onStageChange={setStage}
-                overlaySamples={samples}
-                showOverlay={samples.length > 0}
-                overlayColor={visualLayer?.color}
-                overlaySize={visualLayer?.size}
-                overlayOpacity={targetOpacity}
-                baseLayer={{ mode: "debug" }}
-              />
-            )}
+            {/* 3D Canvas */}
+            <IcosahedronGlobe
+              ref={globeRef}
+              stage={targetStage}
+              onStageChange={setStage}
+              overlaySamples={samples}
+              showOverlay={samples.length > 0}
+              overlayColor={visualLayer?.color}
+              overlaySize={visualLayer?.size}
+              overlayOpacity={targetOpacity}
+              baseLayer={
+                earthTexture
+                  ? { mode: "texture", texture: earthTexture }
+                  : { mode: "debug" }
+              }
+            />
+
+            {/* FLOATING SPACE HUD TELEMETRY (Only active when folded) */}
+            <div
+              className={`absolute top-4 left-4 md:top-8 md:left-8 z-10 w-48 md:w-56 transition-all duration-500 transform ${!isUnfolded
+                ? "opacity-100 translate-y-0 pointer-events-auto"
+                : "opacity-0 -translate-y-2 pointer-events-none"
+                }`}
+            >
+              <EarthInfo />
+            </div>
           </div>
 
-          {/* 
-              INTENTIONALITY: Map controls fade in only once the unfold has fully
-              completed. Zoom and pan have no meaning on a sphere (or mid-fold), so
-              rendering them earlier would be dead chrome. `tabIndex` is mirrored to
-              the same gate so keyboard users can't tab into invisible, unusable
-              buttons — the same discipline the `pointer-events-none` class already
-              enforces for mice.
-          */}
+          {/* Map Controls */}
           <div
             className={`w-full flex items-center gap-2 transition-opacity duration-300 ${isUnfolded ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
@@ -310,13 +272,9 @@ export default function DymaxionBase() {
             </button>
           </div>
 
-          {/* 
-              Timeline placeholder. Now matches the overlay panel's surface color so
-              the two read as one family of floating cards. The "coming soon" tag is
-              rendered inline beside the label rather than replacing it.
-          */}
+          {/* Timeline Placeholder */}
           <div
-            className={`w-full h-9 flex items-center justify-center gap-3 text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${isUnfolded ? "opacity-100" : "opacity-0 pointer-events-none"
+            className={`w-full h-12 flex items-center justify-center gap-3 text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${isUnfolded ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
             aria-hidden={!isUnfolded}
             style={{
@@ -329,14 +287,15 @@ export default function DymaxionBase() {
           </div>
         </div>
 
-        {/* Floating Overlay Controls */}
+        {/* Side Panel: Overlay Controls (Animates along with grid track) */}
         <div
-          className={`lg:col-span-1 w-full transition-opacity duration-300 ${isUnfolded ? "opacity-100" : "opacity-0 pointer-events-none"
+          className={`w-full h-full overflow-hidden transition-all duration-500 ease-in-out ${isUnfolded
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none"
             }`}
-          aria-hidden={!isUnfolded}
         >
           <div
-            className="p-5 flex flex-col gap-3 h-full"
+            className="p-5 flex flex-col gap-3 h-full min-w-[280px]"
             style={{
               background: "var(--color-surface)",
               boxShadow: "var(--color-shadow)",
@@ -349,15 +308,6 @@ export default function DymaxionBase() {
               Overlays
             </h2>
 
-            {/* 
-                INTENTIONALITY: Square, sharp-cornered checkboxes replace the old
-                radio group + explicit "Off" row. `appearance-none` gives us full
-                control over the box geometry so it honors the zero-radius design
-                language (native checkboxes round their corners on some platforms).
-                Unchecked uses the page background — a recessed square that stays
-                visible against the panel; checked fills with the accent color.
-                Single-active by design — see `toggleLayer` above.
-            */}
             <div className="flex flex-col gap-2">
               {LAYERS.map((l) => {
                 const checked = activeLayerId === l.id;
@@ -398,7 +348,6 @@ export default function DymaxionBase() {
             )}
           </div>
         </div>
-
       </div>
     </div>
   );

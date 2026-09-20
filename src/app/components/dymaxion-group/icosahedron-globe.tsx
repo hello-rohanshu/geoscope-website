@@ -703,8 +703,10 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
         animRef.current.t = Math.max(0, Math.min(SEGMENT_COUNT, newT));
       } else if (t !== tgt) {
         animRef.current.t = tgt;
+        // Animation just settled. Report the final resting value so the
+        // parent can react to completion, not just boundary crossings.
+        onStageChangeRef.current?.(tgt);
       }
-
       updateGeometry(animRef.current.t);
 
       let boundary = 0;

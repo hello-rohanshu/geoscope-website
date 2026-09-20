@@ -146,26 +146,56 @@ export default function DymaxionBase() {
       : 0;
 
   // ── View gating ──────────────────────────────────────────────────────
-  // Three separate signals, each fired by a different event:
+  // Four signals, each fired by a different event:
   //
-  //   atFlat      — live stage ≥ DYMAXION. Used for the CSS flag on the
-  //                 canvas container, not for showing/hiding UI.
-  //   isUnfolded  — intent. Flips the instant the button is clicked, so
-  //                 the button label/style react immediately. Does NOT
-  //                 wait for any animation.
-  //   uiVisible   — panel, controls, timeline, grid columns. Only true
-  //                 once the wires have fully retracted (stage reaches
-  //                 WIRES_GONE). Collapses the moment fold-back begins.
-  //   hudVisible  — EarthInfo. Hides the instant Unfold is clicked, and
-  //                 waits for fold-back to reach the sphere stage before
-  //                 returning. `stage < SPHERE_TRIANGULATED` is the
-  //                 closest proxy we have to "fully folded back" —
-  //                 onStageChange only fires at stage boundaries, and the
-  //                 boundary-1→0 crossing is the last event of the fold.
+  //   atFlat       — live stage ≥ DYMAXION. Used for the CSS flag on the
+  //                  canvas container, not for showing/hiding UI.
+  //
+  //   isUnfolded   — intent. Flips the instant the button is clicked so
+  //                  the button label/style react immediately. Does NOT
+  //                  wait for any animation.
+  //
+  //   panelVisible — panel, controls, timeline opacity. On unfold, waits
+  //                  until wires have fully retracted. On fold, dies the
+  //                  instant isUnfolded flips, so the panel fades out
+  //                  while the globe is still folding.
+  //
+  //   gridExpanded — whether the grid uses the 2-column (expanded) layout.
+  //                  Stateful because the two directions differ: on
+  //                  unfold it expands with the panel; on fold it LINGERS
+  //                  through the entire globe animation so the canvas
+  //                  doesn't resize mid-fold, then collapses only once
+  //                  the globe has fully reformed into a sphere.
+  //
+  //   hudVisible   — EarthInfo. Hidden the instant Unfold is clicked.
+  //                  On fold-back it waits for the globe to settle AND
+  //                  the grid collapse (canvas resize) to complete.
   const atFlat = stage >= GLOBE_STAGES.DYMAXION;
   const isUnfolded = targetStage >= GLOBE_STAGES.DYMAXION;
-  const uiVisible = stage >= GLOBE_STAGES.WIRES_GONE;
-  const hudVisible = !isUnfolded && stage < GLOBE_STAGES.SPHERE_TRIANGULATED;
+  const panelVisible = isUnfolded && stage >= GLOBE_STAGES.WIRES_GONE;
+
+  const [gridExpanded, setGridExpanded] = useState(false);
+  useEffect(() => {
+    if (isUnfolded && stage >= GLOBE_STAGES.WIRES_GONE) {
+      setGridExpanded(true);
+    } else if (!isUnfolded && stage < GLOBE_STAGES.SPHERE_TRIANGULATED) {
+      setGridExpanded(false);
+    }
+  }, [isUnfolded, stage]);
+
+  const [hudVisible, setHudVisible] = useState(true);
+  useEffect(() => {
+    if (isUnfolded) {
+      setHudVisible(false);
+      return;
+    }
+    if (!gridExpanded) {
+      // Grid has collapsed → canvas is resizing. Wait for the 500ms
+      // transition to finish before fading the HUD back in.
+      const t = setTimeout(() => setHudVisible(true), 500);
+      return () => clearTimeout(t);
+    }
+  }, [isUnfolded, gridExpanded]);
 
   const toggleLayer = (id: LayerId) => {
     setActiveLayerId((current) => (current === id ? null : id));
@@ -199,7 +229,7 @@ export default function DymaxionBase() {
 
       {/* Dynamic Grid Layout with smooth grid-template-columns transition */}
       <div
-        className={`w-full grid transition-all duration-500 ease-in-out items-stretch ${uiVisible
+        className={`w-full grid transition-all duration-500 ease-in-out items-stretch ${gridExpanded
           ? "grid-cols-1 lg:grid-cols-[2fr_1fr] lg:gap-6"
           : "grid-cols-1 lg:grid-cols-[1fr_0fr] lg:gap-0"
           }`}
@@ -245,15 +275,15 @@ export default function DymaxionBase() {
 
           {/* Map Controls */}
           <div
-            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${panelVisible ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
-            aria-hidden={!uiVisible}
+            aria-hidden={!panelVisible}
           >
             <button
               type="button"
               onClick={() => globeRef.current?.zoomIn()}
               aria-label="Zoom in"
-              tabIndex={uiVisible ? 0 : -1}
+              tabIndex={panelVisible ? 0 : -1}
               className="w-9 h-9 flex items-center justify-center text-base font-medium cursor-pointer outline-none"
               style={{
                 background: "var(--color-surface)",
@@ -267,7 +297,7 @@ export default function DymaxionBase() {
               type="button"
               onClick={() => globeRef.current?.zoomOut()}
               aria-label="Zoom out"
-              tabIndex={uiVisible ? 0 : -1}
+              tabIndex={panelVisible ? 0 : -1}
               className="w-9 h-9 flex items-center justify-center text-base font-medium cursor-pointer outline-none"
               style={{
                 background: "var(--color-surface)",
@@ -280,7 +310,7 @@ export default function DymaxionBase() {
             <button
               type="button"
               onClick={() => globeRef.current?.resetView()}
-              tabIndex={uiVisible ? 0 : -1}
+              tabIndex={panelVisible ? 0 : -1}
               className="h-9 px-4 flex items-center justify-center text-xs md:text-sm font-medium cursor-pointer outline-none"
               style={{
                 background: "var(--color-surface)",
@@ -294,9 +324,9 @@ export default function DymaxionBase() {
 
           {/* Timeline Placeholder */}
           <div
-            className={`w-full h-12 flex items-center justify-center gap-3 text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+            className={`w-full h-12 flex items-center justify-center gap-3 text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${panelVisible ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
-            aria-hidden={!uiVisible}
+            aria-hidden={!panelVisible}
             style={{
               background: "var(--color-surface)",
               color: "var(--color-text-muted)",
@@ -309,7 +339,7 @@ export default function DymaxionBase() {
 
         {/* Side Panel: Overlay Controls (Animates along with grid track) */}
         <div
-          className={`w-full h-full overflow-hidden transition-all duration-500 ease-in-out ${uiVisible
+          className={`w-full h-full overflow-hidden transition-all duration-500 ease-in-out ${panelVisible
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
             }`}

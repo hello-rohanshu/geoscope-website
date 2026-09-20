@@ -144,8 +144,28 @@ export default function DymaxionBase() {
     activeLayerId && samples.length > 0
       ? LAYERS.find((l) => l.id === activeLayerId)?.opacity ?? 1
       : 0;
+
+  // ── View gating ──────────────────────────────────────────────────────
+  // Three separate signals, each fired by a different event:
+  //
+  //   atFlat      — live stage ≥ DYMAXION. Used for the CSS flag on the
+  //                 canvas container, not for showing/hiding UI.
+  //   isUnfolded  — intent. Flips the instant the button is clicked, so
+  //                 the button label/style react immediately. Does NOT
+  //                 wait for any animation.
+  //   uiVisible   — panel, controls, timeline, grid columns. Only true
+  //                 once the wires have fully retracted (stage reaches
+  //                 WIRES_GONE). Collapses the moment fold-back begins.
+  //   hudVisible  — EarthInfo. Hides the instant Unfold is clicked, and
+  //                 waits for fold-back to reach the sphere stage before
+  //                 returning. `stage < SPHERE_TRIANGULATED` is the
+  //                 closest proxy we have to "fully folded back" —
+  //                 onStageChange only fires at stage boundaries, and the
+  //                 boundary-1→0 crossing is the last event of the fold.
   const atFlat = stage >= GLOBE_STAGES.DYMAXION;
   const isUnfolded = targetStage >= GLOBE_STAGES.DYMAXION;
+  const uiVisible = stage >= GLOBE_STAGES.WIRES_GONE;
+  const hudVisible = !isUnfolded && stage < GLOBE_STAGES.SPHERE_TRIANGULATED;
 
   const toggleLayer = (id: LayerId) => {
     setActiveLayerId((current) => (current === id ? null : id));
@@ -179,7 +199,7 @@ export default function DymaxionBase() {
 
       {/* Dynamic Grid Layout with smooth grid-template-columns transition */}
       <div
-        className={`w-full grid transition-all duration-500 ease-in-out items-stretch ${isUnfolded
+        className={`w-full grid transition-all duration-500 ease-in-out items-stretch ${uiVisible
           ? "grid-cols-1 lg:grid-cols-[2fr_1fr] lg:gap-6"
           : "grid-cols-1 lg:grid-cols-[1fr_0fr] lg:gap-0"
           }`}
@@ -214,7 +234,7 @@ export default function DymaxionBase() {
 
             {/* FLOATING SPACE HUD TELEMETRY (Only active when folded) */}
             <div
-              className={`absolute top-4 left-4 md:top-8 md:left-8 z-10 w-48 md:w-56 transition-all duration-500 transform ${!isUnfolded
+              className={`absolute top-4 left-4 md:top-8 md:left-8 z-10 w-48 md:w-56 transition-all duration-500 transform ${hudVisible
                 ? "opacity-100 translate-y-0 pointer-events-auto"
                 : "opacity-0 -translate-y-2 pointer-events-none"
                 }`}
@@ -225,15 +245,15 @@ export default function DymaxionBase() {
 
           {/* Map Controls */}
           <div
-            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${isUnfolded ? "opacity-100" : "opacity-0 pointer-events-none"
+            className={`w-full flex items-center gap-2 transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
-            aria-hidden={!isUnfolded}
+            aria-hidden={!uiVisible}
           >
             <button
               type="button"
               onClick={() => globeRef.current?.zoomIn()}
               aria-label="Zoom in"
-              tabIndex={isUnfolded ? 0 : -1}
+              tabIndex={uiVisible ? 0 : -1}
               className="w-9 h-9 flex items-center justify-center text-base font-medium cursor-pointer outline-none"
               style={{
                 background: "var(--color-surface)",
@@ -247,7 +267,7 @@ export default function DymaxionBase() {
               type="button"
               onClick={() => globeRef.current?.zoomOut()}
               aria-label="Zoom out"
-              tabIndex={isUnfolded ? 0 : -1}
+              tabIndex={uiVisible ? 0 : -1}
               className="w-9 h-9 flex items-center justify-center text-base font-medium cursor-pointer outline-none"
               style={{
                 background: "var(--color-surface)",
@@ -260,7 +280,7 @@ export default function DymaxionBase() {
             <button
               type="button"
               onClick={() => globeRef.current?.resetView()}
-              tabIndex={isUnfolded ? 0 : -1}
+              tabIndex={uiVisible ? 0 : -1}
               className="h-9 px-4 flex items-center justify-center text-xs md:text-sm font-medium cursor-pointer outline-none"
               style={{
                 background: "var(--color-surface)",
@@ -274,9 +294,9 @@ export default function DymaxionBase() {
 
           {/* Timeline Placeholder */}
           <div
-            className={`w-full h-12 flex items-center justify-center gap-3 text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${isUnfolded ? "opacity-100" : "opacity-0 pointer-events-none"
+            className={`w-full h-12 flex items-center justify-center gap-3 text-xs font-semibold tracking-wider uppercase transition-opacity duration-300 ${uiVisible ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
-            aria-hidden={!isUnfolded}
+            aria-hidden={!uiVisible}
             style={{
               background: "var(--color-surface)",
               color: "var(--color-text-muted)",
@@ -289,9 +309,9 @@ export default function DymaxionBase() {
 
         {/* Side Panel: Overlay Controls (Animates along with grid track) */}
         <div
-          className={`w-full h-full overflow-hidden transition-all duration-500 ease-in-out ${isUnfolded
-              ? "opacity-100 pointer-events-auto"
-              : "opacity-0 pointer-events-none"
+          className={`w-full h-full overflow-hidden transition-all duration-500 ease-in-out ${uiVisible
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
             }`}
         >
           <div

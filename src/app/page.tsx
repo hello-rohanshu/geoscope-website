@@ -19,7 +19,7 @@ function Section({
 }) {
   return (
     <section
-      className={`relative z-10 flex min-h-[100svh] w-full items-center justify-center px-10 sm:px-12 md:px-16 lg:px-24 py-8 ${className}`}
+      className={`relative z-10 flex min-h-[100svh] w-full items-center justify-center pl-6 pr-14 sm:px-12 md:px-16 lg:px-24 py-8 ${className}`}
     >
       <div className="w-full max-w-7xl flex items-center justify-center z-20">
         {children}

@@ -50,6 +50,11 @@ const PAN_EASE: number = 0.382;
 /** Slower ease used while a reset is in flight, so the view glides home. */
 const RESET_EASE = 0.0618;
 
+/** Per-frame lerp for overlay point opacity. Tuned so a layer fades in
+ *  or out over roughly half a second at 60fps. */
+const OVERLAY_FADE_IN_EASE = 0.06;
+const OVERLAY_FADE_OUT_EASE = 0.12;
+
 /** If true, wheel zoom keeps the point under the cursor fixed on screen.
  *  If false, zoom is centered on the map center. */
 const ZOOM_TO_CURSOR: boolean = false;
@@ -131,6 +136,9 @@ interface AnimState {
   tgt: number;
   /** Whether the user is actively dragging to rotate the globe. */
   drag: boolean;
+  /** Target globe rotation, matching the stars' target-then-lerp approach. */
+  rotX: number;
+  rotY: number;
   /** Current requestAnimationFrame tick handle for cleanup. */
   frameId: number;
 }
@@ -187,12 +195,14 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
   const wiresRef = useRef<THREE.LineSegments[]>([]);
 
   // Mutable animation state container to avoid react re-renders on every frame
-  const animRef = useRef<AnimState>({
-    t: stage,
-    tgt: stage,
-    drag: false,
-    frameId: 0,
-  });
+const animRef = useRef<AnimState>({
+  t: stage,
+  tgt: stage,
+  drag: false,
+  rotX: 0,
+  rotY: 0,
+  frameId: 0,
+});
 
   /**
    * Map-mode view state. Only meaningful once the fold is fully flat.
@@ -445,9 +455,9 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
             const scale = 0.005 * (z / FLAT_Z);
             viewRef.current.panX += dx * scale;
             viewRef.current.panY -= dy * scale;
-          } else if (groupRef.current) {
-            groupRef.current.rotation.y += dx * 0.005;
-            groupRef.current.rotation.x += dy * 0.005;
+          } else {
+            animRef.current.rotY += dx * 0.005;
+            animRef.current.rotX += dy * 0.005;
           }
         }
 
@@ -654,10 +664,16 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
     if (overlaySamples && overlaySamples.length > 0) {
       const buffers = buildOverlayBuffers(overlaySamples);
       updateOverlayPositions(buffers, animRef.current.t, STAGGER_RATIO, NUM_FACES);
+      // Fresh Points start invisible and ease up. This makes fade-in robust
+      // to cases where the previous fade-out didn't finish before the buffers
+      // were replaced (e.g. a backgrounded tab pausing rAF while the parent's
+      // cleanup timer kept running) — otherwise the new material would inherit
+      // the stale mid-fade opacity and pop in at full strength.
+      overlayCurrentOpacityRef.current = 0;
       const points = createOverlayPoints(buffers, {
         color: overlayColor,
         size: overlaySize,
-        opacity: overlayOpacity,
+        opacity: 0,
       });
       points.frustumCulled = false;
       points.visible = showOverlay;
@@ -672,10 +688,41 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
     if (overlayPointsRef.current) overlayPointsRef.current.visible = showOverlay;
   }, [showOverlay]);
 
+  // Live opacity. The parent hands us a *target*; the render loop eases the
+  // material toward it every frame. Both the target and the current on-screen
+  // value live in refs, so a Points object rebuilt mid-fade — e.g. when a new
+  // layer's samples arrive — inherits the opacity that's actually visible
+  // instead of snapping to the prop value at the moment of the rebuild.
+  const overlayTargetOpacityRef = useRef(0);
+  const overlayCurrentOpacityRef = useRef(0);
+  useEffect(() => {
+    overlayTargetOpacityRef.current = overlayOpacity ?? 1;
+  }, [overlayOpacity]);
+
   // Main render loop handling interpolation and idle rotation
   useEffect(() => {
     const loop = (): void => {
       const { t, tgt, drag } = animRef.current;
+
+      // Ease overlay opacity toward its target every frame. Both the
+      // target and the current on-screen value live in refs, so a Points
+      // object rebuilt mid-fade inherits the opacity that's actually
+      // visible instead of snapping to the prop value.
+      const pts = overlayPointsRef.current;
+      if (pts) {
+        const mat = pts.material as THREE.PointsMaterial;
+        mat.transparent = true;
+        const target = overlayTargetOpacityRef.current;
+        const current = overlayCurrentOpacityRef.current;
+        const ease = target > current
+          ? OVERLAY_FADE_IN_EASE
+          : OVERLAY_FADE_OUT_EASE;
+
+        const next = current + (target - current) * ease;
+        const snapped = Math.abs(target - next) < 0.002 ? target : next;
+        overlayCurrentOpacityRef.current = snapped;
+        mat.opacity = snapped;
+      }
 
       // Smooth step towards target stage position
       if (Math.abs(t - tgt) > 0.0005) {
@@ -720,16 +767,25 @@ const IcosahedronGlobe = forwardRef<GlobeControls, IcosahedronGlobeProps>(({
         groupRef.current.position.y += (targetPanY - groupRef.current.position.y) * panEase;
       }
 
-      // Automated camera/group orientation behavior
-      if (!drag && groupRef.current) {
-        if (animRef.current.tgt >= GLOBE_STAGES.DYMAXION) {
-          // Damped realignment to face flat net towards camera when fully unfolded.
-          // Holds through stage 4 as well, so the flat net stays square-on while wires retract.
-          const progress = animRef.current.t / SEGMENT_COUNT;
-          const damping = 0.02 + progress * 0.06;
-          groupRef.current.rotation.x += (-0 - groupRef.current.rotation.x) * damping;
-          groupRef.current.rotation.y += (0 - groupRef.current.rotation.y) * damping;
-        }
+      // Automated rotation target + smooth rendered rotation.
+      if (!drag && animRef.current.tgt >= GLOBE_STAGES.DYMAXION) {
+        // Damped realignment target for the flat net.
+        const progress = animRef.current.t / SEGMENT_COUNT;
+        const damping = 0.02 + progress * 0.06;
+
+        animRef.current.rotX += (0 - animRef.current.rotX) * damping;
+        animRef.current.rotY += (0 - animRef.current.rotY) * damping;
+      }
+
+      // Match the stars' smooth target → rendered rotation.
+      if (groupRef.current) {
+        const d = animRef.current;
+
+        groupRef.current.rotation.y +=
+          (d.rotY - groupRef.current.rotation.y) * 0.15;
+
+        groupRef.current.rotation.x +=
+          (d.rotX - groupRef.current.rotation.x) * 0.15;
       }
 
       const cam = cameraRef.current;

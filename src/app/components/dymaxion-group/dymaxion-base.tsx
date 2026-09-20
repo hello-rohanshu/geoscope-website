@@ -59,6 +59,8 @@ export default function DymaxionBase() {
   const [stage, setStage] = useState<number>(GLOBE_STAGES.SPHERE);
   const [targetStage, setTargetStage] = useState<number>(GLOBE_STAGES.SPHERE);
 
+  const lastLayerRef = useRef<LayerDef | null>(null);
+
   const samplesCacheRef = useRef<Map<LayerId, OverlaySample[]>>(new Map());
 
   /**
@@ -83,7 +85,6 @@ export default function DymaxionBase() {
   // Load / switch active raster layer
   useEffect(() => {
     if (!activeLayerId) {
-      setSamples([]);
       return;
     }
 
@@ -121,6 +122,21 @@ export default function DymaxionBase() {
     };
   }, [activeLayerId]);
 
+  // Release the sample payload once the layer has been off long enough for
+  // the globe to finish easing the overlay out. The globe owns the fade now,
+  // so we can't synchronously drop the points the moment opacity hits zero —
+  // we'd cut the fade short.
+  useEffect(() => {
+    const target = activeLayerId && samples.length > 0
+      ? (LAYERS.find((l) => l.id === activeLayerId)?.opacity ?? 1)
+      : 0;
+    if (target > 0 || samples.length === 0) return;
+    const t = setTimeout(() => {
+      setSamples((s) => (s.length ? [] : s));
+    }, 900);
+    return () => clearTimeout(t);
+  }, [activeLayerId, samples.length]);
+
   /**
    * Drop any active overlay the moment the globe stops being fully unfolded.
    * Folding is a "put it away" gesture — leaving a data layer lit on a
@@ -137,6 +153,13 @@ export default function DymaxionBase() {
     ? LAYERS.find((l) => l.id === activeLayerId)
     : null;
 
+  if (activeLayer) lastLayerRef.current = activeLayer;
+  const visualLayer = activeLayer ?? lastLayerRef.current;
+  // Target opacity for the globe. The globe eases the material toward this
+  // value every frame, so we can hand it a step change without any popping.
+  const targetOpacity = activeLayerId && samples.length > 0
+    ? (LAYERS.find((l) => l.id === activeLayerId)?.opacity ?? 1)
+    : 0;
   const atFlat = stage >= GLOBE_STAGES.DYMAXION;
   const isUnfolded = stage >= GLOBE_STAGES.DYMAXION;
 
@@ -210,10 +233,10 @@ export default function DymaxionBase() {
                 stage={targetStage}
                 onStageChange={setStage}
                 overlaySamples={samples}
-                showOverlay={activeLayerId !== null}
-                overlayColor={activeLayer?.color}
-                overlaySize={activeLayer?.size}
-                overlayOpacity={activeLayer?.opacity}
+                showOverlay={samples.length > 0}
+                overlayColor={visualLayer?.color}
+                overlaySize={visualLayer?.size}
+                overlayOpacity={targetOpacity}
                 baseLayer={{ mode: "texture", texture: earthTexture }}
               />
             ) : (
@@ -222,10 +245,10 @@ export default function DymaxionBase() {
                 stage={targetStage}
                 onStageChange={setStage}
                 overlaySamples={samples}
-                showOverlay={activeLayerId !== null}
-                overlayColor={activeLayer?.color}
-                overlaySize={activeLayer?.size}
-                overlayOpacity={activeLayer?.opacity}
+                showOverlay={samples.length > 0}
+                overlayColor={visualLayer?.color}
+                overlaySize={visualLayer?.size}
+                overlayOpacity={targetOpacity}
                 baseLayer={{ mode: "debug" }}
               />
             )}

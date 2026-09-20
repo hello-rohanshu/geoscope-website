@@ -19,7 +19,7 @@ function Section({
 }) {
   return (
     <section
-      className={`relative z-10 flex min-h-[100svh] w-full items-center justify-center px-10 sm:px-12 md:px-16 lg:px-24 py-8 border-4 border-white ${className}`}
+      className={`relative z-10 flex min-h-[100svh] w-full items-center justify-center px-10 sm:px-12 md:px-16 lg:px-24 py-8 ${className}`}
     >
       <div className="w-full max-w-7xl flex items-center justify-center z-20">
         {children}
@@ -52,16 +52,14 @@ export default function Home() {
   return (
     <main className="relative text-white overflow-x-hidden">
 
-      <Section className="z-10">
-        <GeoscopeCanvas />
+      <GeoscopeCanvas />
+
+      <Section className="relative z-20">
+        <DomainPanels />
       </Section>
 
       <Section className="z-10">
         <DymaxionBase />
-      </Section>
-
-      <Section className="relative z-20">
-        <DomainPanels />
       </Section>
 
       <Section className="relative z-20">

@@ -37,7 +37,7 @@ const LAYERS: LayerDef[] = [
   },
   {
     id: "blackmarble",
-    label: "Black Marble (2016)",
+    label: "Night Light Density (2016)",
     url: "/BlackMarble_2016_3km_gray_geo_cog.tif",
     color: "#ffd97a",
     size: 0.006,

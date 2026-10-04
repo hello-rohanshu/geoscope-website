@@ -5,30 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## unreleased
+<!-- ## [Unreleased]
+### Added
+### Changed
+### Fixed
+### Removed -->
 
-the setup then will be:
-4 portals, probably leading to 4 main areas of each... (the frameowkr when gets better will make this more whole)
-then the globe
-then story of humanity
-then the ephemeralization list... (aiming to show via some infographic or visuals, how things are getting easier and life has gotten easier)
-then title card
+## [0.2.0] - 2026-09-20
 
-the globe will have an unfold button of course i guess, which will open it and show the ui for overlays and timeline manipulation.
+### Added
+- Mobile compatibility
+- A basic but consistent design guideline
+- Title card: "Geoscope" at the end of the site
+- An interactive three.js Earth which morphs into an icosahedron, and then unfolds into the Dymaxion map, revealing map UI controls and an overlay panel
+- A full page starry canvas which pretends to be the aforementioned Earth sphere's background, as well as the site's, while responding to any interaction with the Earth.
+- Map overlay data layer option 2016 night light density from NASA 'Black Marble'
 
-the background of the globe, the starry parallax (which too needs work but still look passable for an initial version) is also the background of the whole site too. it scrolls on y axis. rotates only on rotating the globe.
+### Changed
+- Revamped the entire backend of the site
+- Changed and improved the Story of Humanity timeline cards UI and UX to adhere to the new design
+- Changed and improved Design Science Revolution progress to show Internet, Supergrid, and N/A as three key checkpoint-milestones of our journey
 
-## [0.6.0-alpha] - 2026-08-31
+### Fixed
+- The site will no longer feel like a 1FPS slog. Fixed performance by cleaning up packages and rendering.
 
-(Generated with AI, can be approximate)
+### Removed
+- Removed the 5 portal cards as they were too far away from newly defined minimal aesthetics. Replaced with a 'work in progress' blurred out component.
+- Removed the old laggy Dymaxion map setup as the new unfold setup replaces its functionality fully
 
-### What we have
-- **Title screen** — animated hero, no data
-- **Story of Humanity** — timeline card UI with arrows, illustrative content
-- **Dymaxion Map** — real population data, column toggle for overlays
-- **Icosahedron Globe** — interactive, click opens into Dymaxion map
-- **World Game Progress** — dummy progress bar between today and utopia
-- **Portal system** — 4 cards showing humanity's current situation at a glance, not yet on page
+## [0.1.0] - 2025-12-04
 
-### Problems
-- Everything lags, is unpolished and may also crash older devices
+### Added
+- 5 infographic panels, showing humanity's current situation at a glance, currently with dummy data: Life Support, Crew Harmony, Fuel System, Navigation, and Population
+- Aforementioned panels are atop a Cesium 3D Earth background
+- Story of humanity timeline cards based on Bucky's Operating Manual for Spaceship Earth book
+- A Dymaxion map displaying population density data of 2024 via a GeoTIFF file
+- A proof-of-concept Design Science Revolution progress bar

@@ -9,19 +9,23 @@ import DomainPanels from '@/app/components/domain-panels';
 import DesignScienceProgress from '@/app/components/design-science-progress';
 import DymaxionBase from "@/app/components/dymaxion-group/dymaxion-base";
 
-// Reusable full-screen layout wrapper providing site-wide boundary/padding
+// Dynamic layout wrapper accepting a numerical viewport height multiplier cap
 function Section({
   children,
   className = '',
+  multiplier = 1,
 }: {
   children: ReactNode;
   className?: string;
+  multiplier?: number;
 }) {
   return (
     <section
-      className={`relative z-10 flex min-h-[100svh] w-full items-center justify-center pl-6 pr-14 sm:pl-7 sm:pr-21 md:pl-10 md:pr-24 lg:px-24 py-14 ${className}`}
+      style={{ height: `${multiplier * 100}svh` }}
+      /* Restored py-14 here */
+      className={`relative z-10 flex w-full items-center justify-center pl-6 pr-14 sm:pl-7 sm:pr-21 md:pl-10 md:pr-24 lg:px-24 py-14 overflow-hidden ${className}`}
     >
-      <div className="w-full max-w-7xl flex items-center justify-center z-20">
+      <div className="w-full max-w-7xl h-full flex items-center justify-center z-20 min-h-0">
         {children}
       </div>
     </section>
@@ -61,23 +65,28 @@ export default function Home() {
 
       <GeoscopeCanvas />
 
-      <Section className="relative z-20">
+      {/* 100svh max limit */}
+      <Section multiplier={1} className="relative z-20">
         <DomainPanels />
       </Section>
 
-      <Section className="z-10">
+      {/* 160svh max limit */}
+      <Section multiplier={1} className="z-10">
         <DymaxionBase />
       </Section>
 
-      <Section className="relative z-20">
+      {/* 160svh max limit */}
+      <Section multiplier={1} className="relative z-20">
         <HumanityTimeline />
       </Section>
 
-      <Section className="relative z-20">
+      {/* 100svh max limit */}
+      <Section multiplier={1} className="relative z-20">
         <DesignScienceProgress />
       </Section>
 
-      <Section className="relative z-20">
+      {/* 100svh max limit */}
+      <Section multiplier={1} className="relative z-20">
         <GeoscopeTitleCard />
       </Section>
 

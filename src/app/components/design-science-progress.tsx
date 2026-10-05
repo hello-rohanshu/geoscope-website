@@ -72,7 +72,7 @@ function HexNut({ completed }: { completed: boolean }) {
 
 export default function DesignScienceProgress() {
   return (
-    <div className="w-full h-full max-h-[640px] flex flex-col justify-between py-6 sm:py-8 px-4 sm:px-6 pointer-events-auto bg-transparent min-h-0 overflow-hidden">
+    <div className="w-full h-full min-h-0 flex flex-col justify-between py-2 sm:py-4 px-4 sm:px-6 pointer-events-auto bg-transparent">
       <style>{`
         @keyframes singlePassPulseHorizontal {
           0% { transform: translateX(-100%); }
@@ -118,13 +118,13 @@ export default function DesignScienceProgress() {
         }
       `}</style>
 
-      {/* Header */}
-      <div className="w-full text-left shrink-0 mb-4 sm:mb-6">
+      {/* Header (shrink-0 so it never collapses) */}
+      <div className="w-full text-left shrink-0 mb-3">
         <h1 className="title-section text-xl sm:text-2xl font-bold tracking-tight">Design Science Revolution</h1>
       </div>
 
-      {/* Stepper Pipeline */}
-      <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-6 sm:gap-0 shrink-0 my-auto">
+      {/* Stepper Pipeline (shrink-0 so it stays fixed) */}
+      <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 sm:gap-0 shrink-0 my-auto">
         {milestones.map((m, idx) => {
           const isNextActive =
             idx < milestones.length - 1 &&
@@ -179,10 +179,10 @@ export default function DesignScienceProgress() {
         })}
       </div>
 
-      {/* Flexible Timelines Container */}
-      <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-6 flex-1 min-h-0">
+      {/* Grid Container (Takes remaining space and forces cards to shrink) */}
+      <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-4 flex-1 min-h-0 md:grid-rows-[minmax(0,1fr)]">
         {/* Column 1: Internet */}
-        <div className="bg-slate-900/80 p-4 sm:p-5 rounded-none flex flex-col justify-start h-full max-h-[220px] md:max-h-full overflow-y-auto visible-scrollbar">
+        <div className="bg-slate-900/80 p-4 sm:p-5 rounded-none flex flex-col justify-start h-full min-h-0 overflow-y-auto visible-scrollbar">
           <ul className="space-y-3 sm:space-y-4">
             {internetTimeline.map((item, i) => (
               <li key={i} className="flex items-start gap-2.5 text-left">
@@ -210,7 +210,7 @@ export default function DesignScienceProgress() {
         </div>
 
         {/* Column 2: Supergrid */}
-        <div className="bg-slate-900/80 p-4 sm:p-5 rounded-none flex flex-col justify-start min-h-0 overflow-y-auto visible-scrollbar">
+        <div className="bg-slate-900/80 p-4 sm:p-5 rounded-none flex flex-col justify-start h-full min-h-0 overflow-y-auto visible-scrollbar">
           <ul className="space-y-3 sm:space-y-4">
             {supergridTimeline.map((item, i) => (
               <li key={i} className="flex items-start gap-2.5 text-left">
@@ -238,7 +238,7 @@ export default function DesignScienceProgress() {
         </div>
 
         {/* Column 3: TBD */}
-        <div className="bg-slate-900/80 p-4 sm:p-5 rounded-none flex items-center justify-center min-h-0 overflow-y-auto visible-scrollbar">
+        <div className="bg-slate-900/80 p-4 sm:p-5 rounded-none flex items-center justify-center h-full min-h-0 overflow-y-auto visible-scrollbar">
           <span className="text-slate-500 font-mono text-sm tracking-widest font-semibold">TBD</span>
         </div>
       </div>

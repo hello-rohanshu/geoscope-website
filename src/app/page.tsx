@@ -8,6 +8,7 @@ import GeoscopeTitleCard from '@/app/components/title-card';
 import DomainPanels from '@/app/components/domain-panels';
 import DesignScienceProgress from '@/app/components/design-science-progress';
 import DymaxionBase from "@/app/components/dymaxion-group/dymaxion-base";
+import Ephemeralization from '@/app/components/timeline/ephemeralization';
 
 // Dynamic layout wrapper accepting a numerical viewport height multiplier cap
 function Section({
@@ -78,6 +79,11 @@ export default function Home() {
       {/* 160svh max limit */}
       <Section multiplier={1} className="relative z-20">
         <HumanityTimeline />
+      </Section>
+
+      {/* Ephemeralization — Fuller quote + A/B/C progress graph */}
+      <Section multiplier={1.6} className="relative z-20">
+        <Ephemeralization />
       </Section>
 
       {/* 100svh max limit */}

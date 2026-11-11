@@ -80,3 +80,33 @@ Everything else is either exact or close enough that the gap is methodological n
 
 ---
 
+Here's the updated table:
+
+| # | Bucky's exact words | Direct / literal metric | Unit | Best-use metric | Unit | Why best-use wins | Delta |
+|---|---|---|---|---|---|---|---|
+| A | "strength per pound of new metallic alloys" | Specific strength | kN·m/kg | Specific strength | kN·m/kg | Exact match — no gap | 100% |
+| B | "horsepower per each pound and cubic inch of aircraft engines" | Power-to-weight ratio | kW/kg | Power-to-weight ratio | kW/kg | Exact match — cubic inch (power density) tracks so closely it adds nothing | 95% |
+| C | "performance per pounds and cubic inches of new chemistries and electronics" | Compute density (mass) | FLOPS/kg | Compute efficiency | FLOPS/watt | Electronics is the culturally and historically legible emblem of C — what felt like the future in 1969 and what Bucky was really pointing at; chemistries (energy density, Wh/kg) is the lesser included point, real but secondary; weight/volume stopped being the binding constraint almost immediately, power was — FLOPS/watt is what engineers actually chased and what behaves like Bucky's intuition | 55% |
+
+Bucky said: because of three things, we can give everyone on earth a high standard of living within ten years.
+
+A — metals are getting stronger without getting heavier
+
+B — engines are getting more powerful without getting bigger or heavier
+
+C — electronics and chemicals are doing more with less material and space
+
+---
+
+| # | Bucky's exact words | Metric | Unit |
+|---|---|---|---|
+| A | "strength per pound of new metallic alloys" | Specific strength | kN·m/kg |
+| B | "horsepower per each pound and cubic inch of aircraft engines" | Power-to-weight ratio | kW/kg |
+| C | "performance per pounds and cubic inches of new chemistries and electronics" | Transistor density | transistors/mm² |
+
+---
+
+A and B are exact translations — the field measures precisely what Bucky said. C is the closest honest approximation: transistor size is the master variable behind all electronics miniaturization, and Moore's Law (transistors/mm²) is its most direct measurement. Chemistries is the lesser included point in C; electronics is the historically legible emblem of what Bucky was pointing at. The gap between his words ("per pound and cubic inch") and this metric is real but narrow — he was describing the same physical trend from the outside.
+
+---
+

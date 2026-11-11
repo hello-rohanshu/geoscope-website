@@ -1,4 +1,35 @@
 
+What is this?
+
+This document details out my beginning with the prose from Critical Path, trying to figure out what metrics best suit what Bucky was trying to say. The document is divided into two parts. CONCLUSION, and JOURNEY. Conclusion is my final 'read this', while the Journey helps see how the reasoning was done. Each ruler-contained area in the Journey area has to do with a conversation with an AI, likely Sonnet 4.6, ending on a the-then conclusory note. The final segment being the proper explanation and distillation.
+
+# Conclusion
+Prose:
+Because of (A) the constant increase in strength per pound of new metallic alloys, (B) the constant increase in horsepower per each pound and cubic inch of aircraft engines, and (C) the ever-increasing performance per pounds and cubic inches of new chemistries and electronics, in general we have the capability, which can be fully realized within ten years, of producing and sustaining a higher standard of living for all humanity than that ever heretofore experienced or dreamt of by any.
+
+Bucky said: because of three things, we can give everyone on earth a high standard of living within ten years.
+
+A — metals are getting stronger without getting heavier
+
+B — engines are getting more powerful without getting bigger or heavier
+
+C — electronics and chemicals are doing more with less material and space
+
+Table of metrics:
+
+| # | Bucky's exact words | Metric | Unit |
+|---|---|---|---|
+| A | "strength per pound of new metallic alloys" | Specific strength | kN·m/kg |
+| B | "horsepower per each pound and cubic inch of aircraft engines" | Power-to-weight ratio | kW/kg |
+| C | "performance per pounds and cubic inches of new chemistries and electronics" | Transistor density | transistors/mm² |
+
+A and B are exact translations — the field measures precisely what Bucky said. C is the closest honest approximation: transistor size is the master variable behind all electronics miniaturization, and Moore's Law (transistors/mm²) is its most direct measurement. Chemistries is the lesser included point in C; electronics is the historically legible emblem of what Bucky was pointing at. The gap between his words ("per pound and cubic inch") and this metric is real but narrow — he was describing the same physical trend from the outside.
+
+
+
+# Journey
+---
+
 Prose:
 Because of (A) the constant increase in strength per pound of new metallic alloys, (B) the constant increase in horsepower per each pound and cubic inch of aircraft engines, and (C) the ever-increasing performance per pounds and cubic inches of new chemistries and electronics, in general we have the capability, which can be fully realized within ten years, of producing and sustaining a higher standard of living for all humanity than that ever heretofore experienced or dreamt of by any.
 

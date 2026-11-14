@@ -51,7 +51,7 @@ export default function Ephemeralization() {
   const getY = (value: number) => padding.top + chartH - ((value - minVal) / (maxVal - minVal)) * chartH;
 
   return (
-    <div className="w-full flex flex-col items-center pointer-events-auto">
+    <div className="w-full h-full min-h-0 flex flex-col items-center pointer-events-auto">
       {/* Header & Contrast Badge */}
       <div className="w-full mb-3 md:mb-4 flex items-center justify-between shrink-0 gap-4">
         <h1 className="title-section">Ephemeralization</h1>
@@ -74,7 +74,7 @@ export default function Ephemeralization() {
 
       {/* Main Card Wrapper */}
       <div
-        className="w-full flex flex-col relative z-10 overflow-hidden p-5 md:p-7 gap-6"
+        className="w-full flex-1 min-h-0 flex flex-col relative z-10 overflow-hidden p-5 md:p-7 gap-6"
         style={{
           background: "var(--color-surface)",
           boxShadow: "var(--color-shadow)",
@@ -86,7 +86,7 @@ export default function Ephemeralization() {
             className="text-xs sm:text-sm md:text-base leading-relaxed italic font-normal"
             style={{ color: "var(--color-text-summary)" }}
           >
-            &ldquo;Because of (A) the constant increase in strength per pound of new metallic alloys, (B) the constant increase in horsepower per each pound and cubic inch of aircraft engines, and (C) the ever-increasing performance per pounds and cubic inches of new chemistries 198 World Game 199 and electronics, in general we have the capability, which can be fully real ized within ten years, of producing and sustaining a higher standard of liv ing for all humanity than that ever heretofore experienced or dreamt of by any.&rdquo;
+            &ldquo;Because of (A) the constant increase in strength per pound of new metallic alloys, (B) the constant increase in horsepower per each pound and cubic inch of aircraft engines, and (C) the ever-increasing performance per pounds and cubic inches of new chemistries and electronics, in general we have the capability, which can be fully realized within ten years, of producing and sustaining a higher standard of living for all humanity than that ever heretofore experienced or dreamt of by any.&rdquo;
           </p>
           <cite
             className="block text-xs md:text-sm font-medium mt-2.5 not-italic"
@@ -97,11 +97,11 @@ export default function Ephemeralization() {
         </blockquote>
 
         {/* Minimal Line Graph */}
-        <div className="w-full flex flex-col gap-4">
-          <div className="w-full overflow-x-auto">
+        <div className="w-full flex flex-col gap-4 flex-1 min-h-0">
+          <div className="w-full overflow-x-auto flex-1 min-h-0">
             <svg
               viewBox={`0 0 ${width} ${height}`}
-              className="w-full h-auto min-w-[320px] overflow-visible"
+              className="w-full h-full min-w-[320px] overflow-visible"
             >
               {/* Horizontal Gridlines & Y-Axis Labels */}
               {[0, 25, 50, 75, 100].map((val) => {
@@ -184,7 +184,7 @@ export default function Ephemeralization() {
           </div>
 
           {/* Index Legend (Points A, B, C) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-[var(--color-border)]">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-[var(--color-border)] shrink-0">
             {seriesConfig.map((series) => (
               <div
                 key={`legend-${series.key}`}

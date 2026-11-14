@@ -149,7 +149,7 @@ export default function Home() {
 
       {/* Ephemeralization — Fuller quote + A/B/C progress graph */}
       <Section
-        multiplier={{ base: 1.3, lg:1 }}
+        multiplier={{ base: 1 }}
         className="relative z-20"
       >
         <Ephemeralization />
@@ -157,7 +157,7 @@ export default function Home() {
 
       {/* 160svh on phones/sm, 130svh at md, 100svh at lg+ */}
       <Section
-        multiplier={{ base: 1.6, sm: 1.6, md: 1.2, lg: 1, xl: 1 }}
+        multiplier={{ base: 1.6, sm: 1.6, md: 1, lg: 1, xl: 1 }}
         className="relative z-20"
       >
         <DesignScienceProgress />
